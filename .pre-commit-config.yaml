@@ -1,0 +1,57 @@
+repos:
+# general hooks to verify or beautify code
+- repo: git://github.com/pre-commit/pre-commit-hooks
+  rev: v3.1.0
+  hooks:
+  - id: check-added-large-files
+    args: [--maxkb=100000]
+  - id: trailing-whitespace
+  - id: check-docstring-first
+  - id: check-json
+  - id: check-merge-conflict
+  - id: check-xml
+  - id: check-yaml
+  - id: detect-aws-credentials
+    args: [
+      --allow-missing-credentials,
+      --credentials-file, docker-compose/.env,
+    ]
+  - id: detect-private-key
+  - id: mixed-line-ending
+  - id: pretty-format-json
+    args: [--autofix]
+  - id: requirements-txt-fixer
+
+# autoformat code with black formatter
+- repo: https://github.com/psf/black
+  rev: 19.10b0
+  hooks:
+    - id: black
+      files: (^passports)
+      args: [-l 120]
+
+# write a list of third-party modules to .isort.cfg
+- repo: https://github.com/asottile/seed-isort-config
+  rev: v2.2.0
+  hooks:
+    - id: seed-isort-config
+      files: (^passports)
+      args: [--settings-path, passports]
+
+# beautify and sort imports
+- repo: https://github.com/pre-commit/mirrors-isort
+  rev: v5.2.1
+  hooks:
+    - id: isort
+      files: (^passports)
+      args: [--settings-path, passports]
+
+# check code style
+- repo: https://gitlab.com/pycqa/flake8
+  rev: 3.8.3
+  hooks:
+    - id: flake8
+      additional_dependencies: [flake8-isort==3.0.1, flake8-quotes==3.0.0, flake8-print==3.1.4]
+      files: (^passports)
+      args: [--config, passports/.flake8]
+
