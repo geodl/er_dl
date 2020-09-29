@@ -86,9 +86,3 @@ def show_zondres2d_model(filename: PathLike, plot: bool = False, min_value: Opti
         return Image.frombytes("RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
     else:
         return fig
-
-
-# img = show_zondres2d_model(r'F:\PycharmProjects\ER_dl\trash\model_9.dat', min_value=10, max_value=1000, plot=False, return_as_pil=True)
-# img.show()
-
-
