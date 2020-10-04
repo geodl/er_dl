@@ -6,7 +6,7 @@ from pygimli import meshtools as mt
 from pygimli.physics import ert
 import random as rand
 
-#функция выдает список из рандомных координат y для границы слоев (1-5 слоев)
+# функция выдает список из рандомных координат y для границы слоев (1-5 слоев)
 def func1():
     a=[]
     for i in range(1,rand.randint(2,5)):
@@ -25,7 +25,7 @@ def func1():
 
 
 #Модель горизонтальная слоистость
-world = mt.createWorld(start=[0,0],end=[1000,-60],layers=func1())
+world = mt.createWorld(start=[0, 0], end=[1000, -60], layers=func1())
 geom = world
 
 #Модель раздув пласта (горизонтальная слоистость)
@@ -40,10 +40,11 @@ def func2():
     else:
         pass
     return a
-y_kord=func2()
-world = mt.createWorld(start=[0,0],end=[1000,-60],layers=y_kord)
+# y_coord
+y_kord = func2()
+world = mt.createWorld(start=[0, 0], end=[1000, -60], layers=y_kord)
 #func3 генерит координаты для раздува
-def func3(Y0 ):
+def func3(Y0):
     X0 = rand.uniform(5, 1000)
     X1 = X0+rand.uniform(4, 33)
     Y1=Y0+rand.uniform(5, 15)
@@ -51,12 +52,13 @@ def func3(Y0 ):
     Y2=Y0+rand.uniform(5, 15)
     X3=X2+rand.uniform(4, 33)
     return [(X0,Y0), (X1,Y1), (X2,Y2), (X3,Y0)]
-kol_vo=rand.randrange(1, 4)
-if kol_vo==1:
+
+num_layers =rand.randrange(1, 4)
+if num_layers == 1:
     poly1 = mt.createPolygon(func3(y_kord[0]), isClosed=True,
                              addNodes=3, interpolate='linear', marker=1)
     poly=poly1
-elif kol_vo==2:
+elif num_layers == 2:
     poly2 = mt.createPolygon(func3(y_kord[1]), isClosed=True,
                              addNodes=3, interpolate='linear', marker=2)
     poly=poly2
@@ -83,7 +85,7 @@ def func4():
 y_kord=func4()
 world = mt.createWorld(start=[0,0],end=[1000,-60],layers=y_kord)
 #func5 генерит координаты для пережима
-def func5(Y0 ):
+def func5(Y0):
     X0 = rand.uniform(5, 1000)
     X1 = X0+rand.uniform(4, 33)
     Y1=Y0-rand.uniform(5, 15)
@@ -91,12 +93,12 @@ def func5(Y0 ):
     Y2=Y0-rand.uniform(5, 15)
     X3=X2+rand.uniform(4, 33)
     return [(X0,Y0), (X1,Y1), (X2,Y2), (X3,Y0)]
-kol_vo=rand.randrange(1, 4)
-if kol_vo==1:
+num_layers=rand.randrange(1, 4)
+if num_layers == 1:
     poly1 = mt.createPolygon(func5(y_kord[0]), isClosed=True,
                              addNodes=3, interpolate='linear', marker=1)
     poly=poly1
-elif kol_vo==2:
+elif num_layers == 2:
     poly2 = mt.createPolygon(func5(y_kord[1]), isClosed=True,
                              addNodes=3, interpolate='linear', marker=2)
     poly=poly2
