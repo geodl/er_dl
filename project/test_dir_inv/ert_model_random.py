@@ -1,202 +1,263 @@
 import pygimli as pg
-#import pybert as pb
+import pybert as pb
 import numpy as np
 import matplotlib.pyplot as plt
 from pygimli import meshtools as mt
 from pygimli.physics import ert
 import random as rand
+import math
 
-# функция выдает список из рандомных координат y для границы слоев (1-5 слоев)
-def func1():
-    a=[]
-    for i in range(1,rand.randint(2,5)):
-        a.append(rand.uniform(-55,-5))
-    a=sorted(a)
-    if any(abs(a[i + 1] - a[i]) < 5 for i in range(len(a) - 1)):
-        a = func1()
+
+# the function outputs a list of random y coordinates for the layer boundary (1-5 layers)
+def gen_y_for_1_till_5():
+    y = []
+    for i in range(1, rand.randint(2, 5)):
+        y.append(rand.uniform(-55, -5))
+    y = sorted(y)
+    if any(abs(y[i + 1] - y[i]) < 5 for i in range(len(y) - 1)):
+        y = gen_y_for_1_till_5()
     else:
         pass
-    if any(abs(a[i + 1] - a[i]) < 5 for i in range(len(a) - 1)):
-        a = func1()
-    else:
-        pass
-    return a
+    return y
 
 
-
-#Модель горизонтальная слоистость
-world = mt.createWorld(start=[0, 0], end=[1000, -60], layers=func1())
-geom = world
-
-#Модель раздув пласта (горизонтальная слоистость)
-#func2 как func1 только генерит 3 слоя и мощности больше 15
-def func2():
-    a=[]
-    for i in range(1,3):
-        a.append(rand.uniform(-55,-15))
-    a=sorted(a)
-    if any(abs(a[i + 1] - a[i]) < 15 for i in range(len(a) - 1)):
-        a = func1()
-    else:
-        pass
-    return a
-# y_coord
-y_kord = func2()
-world = mt.createWorld(start=[0, 0], end=[1000, -60], layers=y_kord)
-#func3 генерит координаты для раздува
-def func3(Y0):
-    X0 = rand.uniform(5, 1000)
-    X1 = X0+rand.uniform(4, 33)
-    Y1=Y0+rand.uniform(5, 15)
-    X2=X1+rand.uniform(4, 33)
-    Y2=Y0+rand.uniform(5, 15)
-    X3=X2+rand.uniform(4, 33)
-    return [(X0,Y0), (X1,Y1), (X2,Y2), (X3,Y0)]
-
-num_layers =rand.randrange(1, 4)
-if num_layers == 1:
-    poly1 = mt.createPolygon(func3(y_kord[0]), isClosed=True,
-                             addNodes=3, interpolate='linear', marker=1)
-    poly=poly1
-elif num_layers == 2:
-    poly2 = mt.createPolygon(func3(y_kord[1]), isClosed=True,
-                             addNodes=3, interpolate='linear', marker=2)
-    poly=poly2
+print('Do you want to choose a model?\n([y], n)?\n')
+answer1 = input()
+if answer1 == 'n':
+    answer2 = rand.choice([1, 2, 3, 4, 5, 6, 7, 8])
 else:
-    poly1 = mt.createPolygon(func3(y_kord[0]), isClosed=True,
-                            addNodes=3, interpolate='linear', marker=1)
-    poly2 = mt.createPolygon(func3(y_kord[1]), isClosed=True,
-                            addNodes=3, interpolate='linear', marker=2)
-    poly = poly1+poly2
-geom = world + poly
+    print('To select a model, tap its number:\n'
+          '[1] - Horizontal layering\n'
+          '[2] - Bulge of layer\n'
+          '[3] - Pinch of layer\n'
+          '[4] - Sloping layering\n'
+          '[5] - Integration\n'
+          '[6] - Lens\n'
+          '[7] - Layer contact\n'
+          '[8] - Fault\n')
+    answer2 = input()
+if answer2 == '1':
+    # Horizontal layering model
+    world = mt.createWorld(start=[0, 0], end=[1000, -60], layers=gen_y_for_1_till_5())
+    geom = world
 
-#Модель пережим пласта (горизонтальная слоистость)
-#func4 как func1 только генерит 3 слоя и мощности больше 15
-def func4():
-    a=[]
-    for i in range(1,3):
-        a.append(rand.uniform(-45,-5))
-    a=sorted(a)
-    if any(abs(a[i + 1] - a[i]) < 15 for i in range(len(a) - 1)):
-        a = func1()
+elif answer2 == '2':
+    # Bulge of layer
+    def gen_3_y_for_bulge():
+        y = []
+        for i in range(1, 3):
+            y.append(rand.uniform(-50, -15))
+        y = sorted(y)
+        if any(abs(y[i + 1] - y[i]) < 15 for i in range(len(y) - 1)):
+            y = gen_3_y_for_bulge()
+        else:
+            pass
+        return y
+
+
+    y_coord = gen_3_y_for_bulge()
+    world = mt.createWorld(start=[0, 0], end=[1000, -60], layers=y_coord)
+
+
+    def gen_coord_for_bulge(y0):
+        x0 = rand.uniform(5, 900)
+        x1 = x0 + rand.uniform(4, 33)
+        y1 = y0 + rand.uniform(5, 15)
+        x2 = x1 + rand.uniform(4, 33)
+        y2 = y0 + rand.uniform(5, 15)
+        x3 = x2 + rand.uniform(4, 33)
+        return [(x0, y0), (x1, y1), (x2, y2), (x3, y0), (x0, y0)]
+
+
+    num_layers = rand.randrange(1, 4)
+    if num_layers == 1:
+        poly1 = mt.createPolygon(gen_coord_for_bulge(y_coord[0]), isClosed=True,
+                                 addNodes=3, interpolate='linear', marker=3)
+        poly = poly1
+    elif num_layers == 2:
+        poly2 = mt.createPolygon(gen_coord_for_bulge(y_coord[1]), isClosed=True,
+                                 addNodes=3, interpolate='linear', marker=2)
+        poly = poly2
     else:
-        pass
-    return a
-y_kord=func4()
-world = mt.createWorld(start=[0,0],end=[1000,-60],layers=y_kord)
-#func5 генерит координаты для пережима
-def func5(Y0):
-    X0 = rand.uniform(5, 1000)
-    X1 = X0+rand.uniform(4, 33)
-    Y1=Y0-rand.uniform(5, 15)
-    X2=X1+rand.uniform(4, 33)
-    Y2=Y0-rand.uniform(5, 15)
-    X3=X2+rand.uniform(4, 33)
-    return [(X0,Y0), (X1,Y1), (X2,Y2), (X3,Y0)]
-num_layers=rand.randrange(1, 4)
-if num_layers == 1:
-    poly1 = mt.createPolygon(func5(y_kord[0]), isClosed=True,
+        poly1 = mt.createPolygon(gen_coord_for_bulge(y_coord[0]), isClosed=True,
+                                 addNodes=3, interpolate='linear', marker=3)
+        poly2 = mt.createPolygon(gen_coord_for_bulge(y_coord[1]), isClosed=True,
+                                 addNodes=3, interpolate='linear', marker=2)
+        poly = poly1 + poly2
+    geom = world + poly
+
+elif answer2 == '3':
+    # Pinch of layer
+    def gen_3_y_for_pinch():
+        y = []
+        for i in range(1, 3):
+            y.append(rand.uniform(-45, -5))
+        y = sorted(y)
+        if any(abs(y[i + 1] - y[i]) < 15 for i in range(len(y) - 1)):
+            y = gen_y_for_1_till_5()
+        else:
+            pass
+        return y
+
+
+    y_coord = gen_3_y_for_pinch()
+    world = mt.createWorld(start=[0, 0], end=[1000, -60], layers=y_coord)
+
+
+    def gen_coord_for_pinch(y0):
+        x0 = rand.uniform(5, 900)
+        x1 = x0 + rand.uniform(4, 33)
+        y1 = y0 - rand.uniform(5, 15)
+        x2 = x1 + rand.uniform(4, 33)
+        y2 = y0 - rand.uniform(5, 15)
+        x3 = x2 + rand.uniform(4, 33)
+        return [(x0, y0), (x1, y1), (x2, y2), (x3, y0), (x0, y0)]
+
+
+    num_layers = rand.choice([1, 2, 3])
+    poly1 = mt.createPolygon(gen_coord_for_pinch(y_coord[0]), isClosed=True,
                              addNodes=3, interpolate='linear', marker=1)
-    poly=poly1
-elif num_layers == 2:
-    poly2 = mt.createPolygon(func5(y_kord[1]), isClosed=True,
+    poly2 = mt.createPolygon(gen_coord_for_pinch(y_coord[1]), isClosed=True,
                              addNodes=3, interpolate='linear', marker=2)
-    poly=poly2
+    if num_layers == 1:
+        poly = poly1
+    elif num_layers == 2:
+        poly = poly2
+    else:
+        poly = poly1 + poly2
+    geom = world + poly
+
+elif answer2 == '4':
+    # Sloping layering
+    print('do not ready')
+
+elif answer2 == '5':
+    # Integration
+    world = mt.createWorld(start=[0, 0], end=[1000, -60], )
+
+    # Creating coordinates of the implementation
+    x0 = rand.uniform(100, 900)
+    y0 = rand.uniform(-10, -50)
+    width = rand.uniform(5, 40)
+    y1 = y0 + width / 2
+    y2 = y0 - width / 2
+
+    poly1 = mt.createPolygon([(x0, y0), (0, y1), (0, y2), (x0, y0)], isClosed=True,
+                             addNodes=3, interpolate='linear', marker=2)
+    poly2 = mt.createPolygon([(x0, y0), (1000, y1), (1000, y2), (x0, y0)], isClosed=True,
+                             addNodes=3, interpolate='linear', marker=2)
+
+    num_integration = rand.choice([1, 2, 3])
+    if num_integration == 1:
+        poly = poly1
+    elif num_integration == 2:
+        poly = poly2
+    else:
+        poly = poly1 + poly2
+    geom = world + poly
+
+elif answer2 == '6':
+    # Lens
+
+    def gen_coord_for_lens_and_check_position():
+        y0 = rand.uniform(-45, -5)
+
+        def gen_coord_for_lens(y0):
+            x0 = rand.uniform(5, 1000)
+            x1 = x0 + rand.uniform(4, 33)
+            y1 = y0 - rand.uniform(5, 20)
+            x2 = x1 + rand.uniform(4, 33)
+            y2 = y0 - rand.uniform(5, 20)
+            x3 = x2 + rand.uniform(4, 33)
+            return [(x0, y0), (x1, y1), (x2, y2), (x3, y0), (x0, y0)]
+
+        coord_for_lens = gen_coord_for_lens(y0)
+        coord_for_layers = gen_y_for_1_till_5()
+        if 0 < y0 < coord_for_layers[1] or any(
+                coord_for_layers[i] < y0 < coord_for_layers[i + 1] for i in range(len(coord_for_layers) - 1)) or \
+                coord_for_layers[len(coord_for_layers) - 1] < y0 < -60:
+            pass
+        else:
+            [coord_for_layers, coord_for_lens] = gen_coord_for_lens_and_check_position()
+        return [coord_for_layers, coord_for_lens]
+
+
+    coord = gen_coord_for_lens_and_check_position()
+    world = mt.createWorld(start=[0, 0], end=[1000, -60], layers=coord[0])
+    poly = mt.createPolygon(coord[1], isClosed=True,
+                            addNodes=3, interpolate='linear', marker=(len(coord[0]) + 2))
+    geom = world + poly
+
+elif answer2 == '7':
+    # Layer contact
+
+    # Create coordinates of the contacting layers
+    width = rand.uniform(10, 40)
+    y_low = rand.uniform(-50, -20)
+    x_low = rand.uniform(115, 885)
+    y_up = y_low + width
+    x_up = x_low + rand.uniform(-115, 115)
+
+    world = mt.createWorld(start=[0, 0], end=[1000, -60], layers=[y_low])
+    # Creating contact layers
+    poly1 = mt.createPolygon([(0, y_low), (x_low, y_low), (x_up, y_up), (0, y_up), (0, y_low)], isClosed=True,
+                             addNodes=3, interpolate='linear', marker=3)
+    poly2 = mt.createPolygon([(1000, y_low), (x_low, y_low), (x_up, y_up), (1000, y_up), (1000, y_low)], isClosed=True,
+                             addNodes=3, interpolate='linear', marker=4)
+    # Creating a layer that overlaps the contacts
+    poly3 = mt.createPolygon([(0, 0), (1000, 0), (1000, y_up), (0, y_up), (0, 0)], isClosed=True,
+                             addNodes=3, interpolate='linear', marker=5)
+    geom = world + poly1 + poly2 + poly3
+
+elif answer2 == '8':
+    # Fault
+
+    # Create coordinates of the fault
+    y0 = rand.uniform(-10, -40)
+    y1 = -60
+    x0 = rand.uniform(115, 885)
+    x1 = x0 + rand.uniform(-115, 115)
+    length_of_fault = rand.uniform(20, 75)
+    x00 = x0 + length_of_fault
+    x11 = x1 + length_of_fault
+
+    world = mt.createWorld(start=[0, 0], end=[1000, -60])
+    # Create the body of the fault covering and adjacent layers
+    poly1 = mt.createPolygon([(0, -60), (0, y0), (1000, y0), (1000, -60), (0, -60)], isClosed=True,
+                             addNodes=3, interpolate='linear', marker=1)
+    poly2 = mt.createPolygon([(x0, y0), (x00, y0), (x11, -60), (x1, -60), (x0, y0)], isClosed=True,
+                             addNodes=3, interpolate='linear', marker=2)
+    poly3 = mt.createPolygon([(0, 0), (1000, 0), (1000, y0), (0, y0), (0, 0)], isClosed=True,
+                             addNodes=3, interpolate='linear', marker=3)
+    geom = world + poly1 + poly2 + poly3
+
 else:
-    poly1 = mt.createPolygon(func5(y_kord[0]), isClosed=True,
-                            addNodes=3, interpolate='linear', marker=1)
-    poly2 = mt.createPolygon(func5(y_kord[1]), isClosed=True,
-                            addNodes=3, interpolate='linear', marker=2)
-    poly = poly1+poly2
-geom = world + poly
+    exit()
 
-# layer1 = mt.createPolygon([[0.0, 137], [117.5, 164], [117.5, 162], [0.0, 135]],
-#                           isClosed=True, marker=1, area=1)
-# layer2 = mt.createPolygon([[0.0, 126], [0.0, 135], [117.5, 162], [117.5, 153]],
-#                           isClosed=True, marker=2)
-# layer3 = mt.createPolygon([[0.0, 110], [0.0, 126], [117.5, 153], [117.5, 110]],
-#                           isClosed=True, marker=3)
-#
-# slope = (164 - 137) / 117.5
-#
-# geom = layer1 + layer2 + layer3
+r = []
+for i in range(1, 7):
+    r1 = rand.randint(10, 1000)
+    r2 = rand.randint(10, 1000)
+    r.append(sorted([r1, r2]))
+# СХЕМА ДИПОЛЬ-ДИПОЛЬ, расст. м/у эл. = 100 м
+scheme = ert.createERTData(elecs=np.linspace(start=0, stop=10, num=41), schemeName='slm')
 
-#Модель линза
-def func1():
-    a=[]
-    for i in range(1,rand.randint(2,5)):
-        a.append(rand.uniform(-55,-5))
-    a=sorted(a)
-    if any(abs(a[i + 1] - a[i]) < 5 for i in range(len(a) - 1)):
-        a = func1()
-    else:
-        pass
-    if any(abs(a[i + 1] - a[i]) < 5 for i in range(len(a) - 1)):
-        a = func1()
-    else:
-        pass
-    return a
+# СДЕЛАЛИ ДИСКРЕТИЗАЦИЮ БУДУЩЕЙ СЕТКИ КАК 10% РАССТОЯНИЯ М/У ЭЛЕКТРОДАМИ, ДЛЯ НОРМ КАЧЕСТВА
+for p in scheme.sensors():
+    geom.createNode(p)
+    geom.createNode(p - [0, 0.1])
 
-def func7():
-    Y0 = rand.uniform(-45, -5)
-    # func6 генерит координаты для линзы
-    def func6(Y0):
-        X0 = rand.uniform(5, 1000)
-        X1 = X0 + rand.uniform(4, 33)
-        Y1 = Y0 - rand.uniform(5, 20)
-        X2 = X1 + rand.uniform(4, 33)
-        Y2 = Y0 - rand.uniform(5, 20)
-        X3 = X2 + rand.uniform(4, 33)
-        return [(X0, Y0), (X1, Y1), (X2, Y2), (X3, Y0)]
-    b=func6(Y0)
-    a=func1()
-    if 0 < Y0 < a[1] or any(a[i] < Y0 < a[i+1] for i in range(len(a) - 1)) or a[len(a)-1] < Y0 < -60:
-        pass
-    else:
-        [a,b] = func7()
-    return [a,b]
-c = func7()
-world = mt.createWorld(start=[0,0],end=[1000,-60],layers=c[0])
-poly = mt.createPolygon(c[1], isClosed=True,
-                             addNodes=3, interpolate='linear', marker=len(c[0]+1))
-geom = world + poly
-
-
-#Модель контакт слоёв
-
-mosh = rand.uniform(10,40)
-YLOW = rand.uniform(-50,-20)
-XLOW = rand.uniform(115,885)
-YUP = YLOW + mosh
-XUP = XLOW + rand.uniform(-115,115)
-
-world = mt.createWorld(start=[0,0],end=[1000,-60],layers=[XLOW])
-# Создаём контактирующие пласты
-poly1 = mt.createPolygon([(O,YLOW), (XLOW,YLOW), (XUP,YUP), (0,YUP)], isClosed=True,
-                            addNodes=3, interpolate='linear', marker=1)
-poly2 = mt.createPolygon([(1000, YLOW), (XLOW, YLOW), (XUP, YUP), (1000, YUP)], isClosed=True,
-                            addNodes=3, interpolate='linear', marker=1)
-# Создаём слой перекрывающий контактирующие
-poly3 = mt.createPolygon([(0, 0), (0, 1000), (1000, YLOW), (0, YLOW)], isClosed=True,
-                            addNodes=3, interpolate='linear', marker=1)
-geom = world + poly1 + poly2 + poly3
-
-
-#Модель разлом
-
-Y0 = rand.uniform(-10, -40)
-Y1 = -60
-X0 = rand.uniform(115,885)
-X1 = X0 + rand.uniform(-115,115)
-DL = rand.uniform(20, 75)
-X00 = X0 + DL
-X11 = X1 + DL
-
-# Слои сбоу от разлома
-world = mt.createWorld(start=[0, 0], end=[1000, -60], layers=[XLOW])
-# Создаём тело разлома и покрывающий слой
-poly1 = mt.createPolygon([(X0, Y0), (X00, Y0), (X11, -60), (X1, -60)], isClosed=True,
-                            addNodes=3, interpolate='linear', marker=2)
-poly2 = mt.createPolygon([(0, O), (1000, 0), (1000, Y0), (0, Y0)], isClosed=True,
-                            addNodes=3, interpolate='linear', marker=3)
-geom = world + poly1 + poly2
+# ЗАПИЛИЛИ СЕТКУ:
+mesh = mt.createMesh(geom, quality=34)
+# ДАТА ДЛЯ СЕТКИ:
+r = []
+for i in range(7):
+    r1 = i
+    r2 = rand.randint(10, 1000)
+    r.append(sorted([r1, r2]))
+# ВОТ КАК ОНА ВЫГЛЯДИТ:
+# pg.show(mesh,data=rhomap,label=pg.unit('res'),showMesh=True)
+print(type(mesh))
+pg.show(mesh, data=r, label=pg.unit('res'), showMesh=True)
+plt.show()
+# esh.save('mesh_test')
