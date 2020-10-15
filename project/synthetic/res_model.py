@@ -11,9 +11,6 @@ import geopandas as gpd
 ResType = Union[float, np.ndarray]
 PointType = Union[Tuple[float, float], np.ndarray]
 
-rand.seed(1)
-np.random.seed(1)
-
 
 class ModelConfig:
     class ResValues:
@@ -364,10 +361,14 @@ class PGMeshCreator:
 if __name__ == "__main__":
     from pygimli.viewer.mpl import drawMesh
 
-    layer2 = InclinedLayer(angle=2, height=20, marker=1, depth=20)
-    layer1 = InclinedLayer(angle=-12, height=60, marker=2, depth=20)
+    rand.seed(1)
+    np.random.seed(1)
 
-    mesh = PGMeshCreator([layer1, layer2])
+    layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
+    layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
+    layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
+
+    mesh = PGMeshCreator([layer1, layer2, layer3])
     plc = mesh.plc
 
     fig, ax = pg.plt.subplots()
