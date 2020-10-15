@@ -10,6 +10,8 @@ from pygimli.physics import ert
 import random as rand
 import math
 from pygimli.viewer.mpl import drawMesh
+from shapely.geometry import Polygon, MultiPolygon
+import geopandas as gpd
 
 
 ResType = Union[float, np.ndarray]
@@ -197,7 +199,7 @@ class ResObject:
         delta_pt = (pt[0] + dx, pt[1] + dz)
 
         bottom_intersection = cls._get_intersection_point(pt, delta_pt, *cls.bottom_border_pts)
-        print(bottom_intersection)
+        # print(bottom_intersection)
 
         if bottom_intersection is None:  # lines are parallel
             pass
@@ -231,9 +233,15 @@ class World(ResObject):
         self._construct_mesh()
 
     def _construct_mesh(self):
-        self.mesh = mt.createWorld(start=[ModelConfig.World.left, ModelConfig.World.top],
-                                   end=[ModelConfig.World.right, -ModelConfig.World.bottom],
-                                   marker=self.marker)
+        self.mesh = Polygon([[ModelConfig.World.left, ModelConfig.World.top],
+                             [ModelConfig.World.right, ModelConfig.World.top],
+                             [ModelConfig.World.right, -ModelConfig.World.bottom],
+                             [ModelConfig.World.left, -ModelConfig.World.bottom]])
+
+
+        # self.mesh = mt.createWorld(start=[ModelConfig.World.left, ModelConfig.World.top],
+        #                        end=[ModelConfig.World.right, -ModelConfig.World.bottom],
+        #                        marker=self.marker)
 
 
 class HorizontalLayer(ResObject):
@@ -258,12 +266,10 @@ class HorizontalLayer(ResObject):
         neg_depth = -depth
         neg_height = -height
 
-        self.mesh = mt.createPolygon([[ModelConfig.World.left, neg_depth],
-                                      [ModelConfig.World.right, neg_depth],
-                                      [ModelConfig.World.right, neg_depth + neg_height],
-                                      [ModelConfig.World.left, neg_depth + neg_height]],
-                                     isClosed=True,
-                                     interpolate='spline')
+        self.mesh = Polygon([[ModelConfig.World.left, neg_depth],
+                             [ModelConfig.World.right, neg_depth],
+                             [ModelConfig.World.right, neg_depth + neg_height],
+                             [ModelConfig.World.left, neg_depth + neg_height]])
 
 
 class InclinedLayer(ResObject):
@@ -320,11 +326,12 @@ class InclinedLayer(ResObject):
             raise ValueError("Angle must be between -90 and 90")
 
         verts = [(vert[0], -vert[1]) for vert in verts]
+        self.mesh = Polygon(verts)
 
         # if self.marker:
-        self.mesh = mt.createPolygon(verts,
-                                     isClosed=True,
-                                     interpolate='spline', marker=self.marker)
+        # self.mesh = mt.createPolygon(verts,
+        #                              isClosed=True,
+        #                              interpolate='spline', marker=self.marker)
 
 
 
@@ -337,12 +344,63 @@ class InclinedLayer(ResObject):
 # l = InclinedLayer(angle=89)
 
 
-world = World(marker=0)
+def merge_two_polygons(background_polygons, extra_polygon):
+    res_union = gpd.overlay(background_polygons, extra_polygon, how='union')
 
-layer2 = InclinedLayer(angle=-3, height=50, marker=1, depth=10)
-layer1 = InclinedLayer(angle=-3, height=100, marker=1, depth=20)
+    res_polygons = []
+    res_markers = []
+
+    for _, row in res_union.iterrows():
+        if isinstance(row['geometry'], MultiPolygon):
+            polygons = list(row['geometry'])
+        else:
+            polygons = [row['geometry']]
+
+        back_marker = row['marker_1']
+        union_marker = row['marker_2']
+        extra_marker = extra_polygon['marker'].iloc[0]
+
+        if union_marker == extra_marker:
+            res_markers += [extra_marker] * len(polygons)
+        else:
+            res_markers += [back_marker] * len(polygons)
+
+        res_polygons += polygons
+
+    return gpd.GeoDataFrame({'geometry': res_polygons, 'marker': res_markers})
+
+
+world_world = World(marker=0)
+world = world_world
+layer2 = InclinedLayer(angle=2, height=20, marker=1, depth=20)
+layer1 = InclinedLayer(angle=-2, height=20, marker=1, depth=20)
 # layer1.set_marker(2)
 
+world = gpd.GeoDataFrame({'geometry': world.get_mesh(), 'marker': [0]})
+layer1 = gpd.GeoDataFrame({'geometry': layer1.get_mesh(), 'marker': [1]})
+layer2 = gpd.GeoDataFrame({'geometry': layer2.get_mesh(), 'marker': [2]})
+
+res_union = merge_two_polygons(world, layer2)
+res_union = merge_two_polygons(res_union, layer1)
+
+
+polys = [
+    mt.createWorld(start=[ModelConfig.World.left, ModelConfig.World.top],
+                        end=[ModelConfig.World.right, -ModelConfig.World.bottom],
+                        marker=0)
+]
+
+for _, rows in res_union.iterrows():
+    if int(rows['marker']) != 0:
+        verts = tuple(zip(*rows['geometry'].exterior.xy))
+        polys.append(mt.createPolygon(verts, isClosed=True, marker=int(rows['marker'])))
+
+plc = mt.polytools.mergePLC(polys)
+
+fig, ax = pg.plt.subplots()
+drawMesh(ax, plc)
+drawMesh(ax, mt.createMesh(plc))
+pg.wait()
 
 # layer2.set_marker(3)
 
@@ -352,43 +410,43 @@ layer1 = InclinedLayer(angle=-3, height=100, marker=1, depth=20)
 #           [2, 3000],
 #           [3, 4000]]
 
-def merge(plcs, tol=1e-3):
-    plc = pg.Mesh(dim=2, isGeometry=True)
-
-    for p in plcs:
-        nodes = []
-        for n in p.nodes():
-            nn = plc.createNodeWithCheck(n.pos(), tol,
-                                         warn=False, edgeCheck=True)
-            if n.marker() != 0:
-                nn.setMarker(n.marker())
-            nodes.append(nn)
-
-        for e in p.boundaries()[::3]:
-            plc.createEdge(nodes[e.node(0).id()], nodes[e.node(1).id()],
-                           e.marker())
-
-        if len(p.regionMarkers()) > 0:
-            for rm in p.regionMarkers():
-                plc.addRegionMarker(rm)
-
-        if len(p.holeMarker()) > 0:
-            for hm in p.holeMarker():
-                plc.addHoleMarker(hm)
-
-    return plc
+# def merge(plcs, tol=1e-3):
+#     plc = pg.Mesh(dim=2, isGeometry=True)
+#
+#     for p in plcs:
+#         nodes = []
+#         for n in p.nodes():
+#             nn = plc.createNodeWithCheck(n.pos(), tol,
+#                                          warn=False, edgeCheck=True)
+#             if n.marker() != 0:
+#                 nn.setMarker(n.marker())
+#             nodes.append(nn)
+#
+#         for e in p.boundaries()[::3]:
+#             plc.createEdge(nodes[e.node(0).id()], nodes[e.node(1).id()],
+#                            e.marker())
+#
+#         if len(p.regionMarkers()) > 0:
+#             for rm in p.regionMarkers():
+#                 plc.addRegionMarker(rm)
+#
+#         if len(p.holeMarker()) > 0:
+#             for hm in p.holeMarker():
+#                 plc.addHoleMarker(hm)
+#
+#     return plc
 
 # plc = world()
 # plc = mt.polytools.mergePLC([plc, layer2()])
 # plc = mt.polytools.mergePLC([plc, layer1()])
 
 
-plc = merge([world(), layer1(), layer2()])
-
-fig, ax = pg.plt.subplots()
-drawMesh(ax, plc)
-drawMesh(ax, mt.createMesh(plc))
-pg.wait()
+# plc = merge([world(), layer1(), layer2()])
+#
+# fig, ax = pg.plt.subplots()
+# drawMesh(ax, plc)
+# drawMesh(ax, mt.createMesh(plc))
+# pg.wait()
 
 
 
