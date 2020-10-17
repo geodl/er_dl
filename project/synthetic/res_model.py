@@ -1,4 +1,3 @@
-'''checking for branching'''
 from typing import Union, Optional, List, Tuple
 import pygimli as pg
 import numpy as np
@@ -329,23 +328,6 @@ class HorizontalLayer(ResObject):
 
 
 class InclinedLayer(ResObject):
-    def __init__(self,
-                 depth: Optional[float] = None,
-                 height: Optional[float] = None,
-                 angle: Optional[float] = None,
-                 *args, **kwargs):
-        """
-        Class allow you create inclined layer with specified parameters.
-
-        See "args" and "kwargs" description in parent class.
-        """
-        super().__init__(*args, **kwargs)
-        self.depth = depth
-        self.height = height
-        self.angle = angle
-
-        self._construct_polygon()
-
     def _construct_polygon(self):
         """
         The method builds a polygon by calculating the coordinates of the top and bottom lines of the layer.
@@ -361,36 +343,36 @@ class InclinedLayer(ResObject):
                                         ModelConfig.InclinedLayer.max_angle,
                                         self.angle,
                                         True)
-
-        if 0 <= angle <= 90:
-            upper_line_pt1 = (ModelConfig.World.right, depth)
-            upper_line_pt2 = self._calc_opposite_point_with_angle(upper_line_pt1, angle)
-            bottom_value = depth + height / np.cos(np.deg2rad(angle))
-
-            if bottom_value > ModelConfig.World.bottom:
-                rb_pt = (ModelConfig.World.right, ModelConfig.World.bottom)
-                verts = [upper_line_pt1, rb_pt, upper_line_pt2]
-            else:
-                lower_line_pt1 = (ModelConfig.World.right, bottom_value)
-                lower_line_pt2 = self._calc_opposite_point_with_angle(lower_line_pt1, angle)
-                verts = [upper_line_pt1, upper_line_pt2, lower_line_pt2, lower_line_pt1]
-
+        '''
+        Finding the point of rotation of the box: box_pt0. Next, we find the points of the box in the coordinate system 
+        associated with the rotation point and add the coordinates of the rotation point 
+        to return to the previous coordinate system
+        '''
+        bottom_value = depth + height / np.cos(np.deg2rad(angle))
+        upper_line_pt1 = (ModelConfig.World.right, depth)
+        box_length = ModelConfig.World.right * 2
+        box_widht = bottom_value / 2
+        if 0 <= angle < 90:
+            rot = angle - 90
         elif -90 <= angle < 0:
-            upper_line_pt1 = (ModelConfig.World.left, depth)
-            upper_line_pt2 = self._calc_opposite_point_with_angle(upper_line_pt1, angle)
-            bottom_value = depth + height / np.cos(np.deg2rad(angle))
-
-            if bottom_value > ModelConfig.World.bottom:
-                lb_pt = (ModelConfig.World.left, ModelConfig.World.bottom)
-                verts = [upper_line_pt1, lb_pt, upper_line_pt2]
-            else:
-                lower_line_pt1 = (ModelConfig.World.left, bottom_value)
-                lower_line_pt2 = self._calc_opposite_point_with_angle(lower_line_pt1, angle)
-                verts = [upper_line_pt1, upper_line_pt2, lower_line_pt2, lower_line_pt1]
+            rot = -(angle - 90)
         else:
             raise ValueError("Angle must be between -90 and 90")
 
-        verts = [(vert[0], -vert[1]) for vert in verts]
+        box_pt0 = [np.cos(np.deg2rad(rot)) * box_widht + upper_line_pt1[0], \
+                   np.sin(np.deg2rad(rot)) * box_widht + upper_line_pt1[1]]
+        box_pt1 = [-box_length * np.cos(np.deg2rad(angle)) - box_widht * np.sin(np.deg2rad(angle)), \
+                   -box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle))]
+        box_pt2 = [box_length * np.cos(np.deg2rad(angle)) - box_widht * np.sin(np.deg2rad(angle)), \
+                   box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle))]
+        box_pt3 = [box_length * np.cos(np.deg2rad(angle)) + box_widht * np.sin(np.deg2rad(angle)), \
+                   box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle))]
+        box_pt4 = [-(box_length) * np.cos(np.deg2rad(angle)) + box_widht * np.sin(np.deg2rad(angle)), \
+                   (-box_length * np.sin(np.deg2rad(angle)) - box_widht * np.cos(np.deg2rad(angle))]
+
+        verts =[box_pt1, box_pt2, box_pt3, box_pt4]
+        verts =[(vert[0] + box_pt0[0], -(vert[1] + box_pt0[1])) for verts in verts]
+        verts = world().intersection(verts).coords
         self.polygon = Polygon(verts)
 
 
