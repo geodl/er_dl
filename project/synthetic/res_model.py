@@ -361,18 +361,17 @@ class InclinedLayer(ResObject):
 
         box_pt0 = [np.cos(np.deg2rad(rot)) * box_widht + upper_line_pt1[0], \
                    np.sin(np.deg2rad(rot)) * box_widht + upper_line_pt1[1]]
-        box_pt1 = [-box_length * np.cos(np.deg2rad(angle)) - box_widht * np.sin(np.deg2rad(angle)), \
-                   -box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle))]
-        box_pt2 = [box_length * np.cos(np.deg2rad(angle)) - box_widht * np.sin(np.deg2rad(angle)), \
-                   box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle))]
-        box_pt3 = [box_length * np.cos(np.deg2rad(angle)) + box_widht * np.sin(np.deg2rad(angle)), \
-                   box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle))]
-        box_pt4 = [-(box_length) * np.cos(np.deg2rad(angle)) + box_widht * np.sin(np.deg2rad(angle)), \
-                   (-box_length * np.sin(np.deg2rad(angle)) - box_widht * np.cos(np.deg2rad(angle))]
+        box_pt1 = (-box_length * np.cos(np.deg2rad(angle)) - box_widht * np.sin(np.deg2rad(angle)) + box_pt0[0], \
+                   -(-box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle)) + box_pt0[1]))
+        box_pt2 = (box_length * np.cos(np.deg2rad(angle)) - box_widht * np.sin(np.deg2rad(angle)) + box_pt0[0], \
+                   -(box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle)) + box_pt0[1]))
+        box_pt3 = (box_length * np.cos(np.deg2rad(angle)) + box_widht * np.sin(np.deg2rad(angle)) + box_pt0[0], \
+                   -((box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle)) + box_pt0[1])))
+        box_pt4 = (-box_length * np.cos(np.deg2rad(angle)) + box_widht * np.sin(np.deg2rad(angle)) + box_pt0[0], \
+                   -((-box_length * np.sin(np.deg2rad(angle)) - box_widht * np.cos(np.deg2rad(angle)) + box_pt0[1])))
 
-        verts =[box_pt1, box_pt2, box_pt3, box_pt4]
-        verts =[(vert[0] + box_pt0[0], -(vert[1] + box_pt0[1])) for verts in verts]
-        verts = world().intersection(verts).coords
+        verts = [box_pt1, box_pt2, box_pt3, box_pt4]
+        verts = World(self).intersection(verts).coords
         self.polygon = Polygon(verts)
 
 
