@@ -293,7 +293,6 @@ class World(ResObject):
     def _construct_polygon(self):
         self.polygon = Polygon(self.get_world_pts())
 
-
 class HorizontalLayer(ResObject):
     def __init__(self,
                  depth: Optional[float] = None,
@@ -358,7 +357,6 @@ class InclinedLayer(ResObject):
             rot = -(angle - 90)
         else:
             raise ValueError("Angle must be between -90 and 90")
-
         box_pt0 = [np.cos(np.deg2rad(rot)) * box_widht + upper_line_pt1[0], \
                    np.sin(np.deg2rad(rot)) * box_widht + upper_line_pt1[1]]
         box_pt1 = (-box_length * np.cos(np.deg2rad(angle)) - box_widht * np.sin(np.deg2rad(angle)) + box_pt0[0], \
@@ -369,10 +367,8 @@ class InclinedLayer(ResObject):
                    -((box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle)) + box_pt0[1])))
         box_pt4 = (-box_length * np.cos(np.deg2rad(angle)) + box_widht * np.sin(np.deg2rad(angle)) + box_pt0[0], \
                    -((-box_length * np.sin(np.deg2rad(angle)) - box_widht * np.cos(np.deg2rad(angle)) + box_pt0[1])))
-
         verts = [box_pt1, box_pt2, box_pt3, box_pt4]
-        verts = World(self).intersection(verts).coords
-        self.polygon = Polygon(verts)
+        return self.create_pg_world().intersection(verts)
 
 
 class PGMeshCreator:
@@ -464,11 +460,12 @@ if __name__ == "__main__":
     rand.seed(1)
     np.random.seed(1)
 
-    layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
-    layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
-    layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
+    # layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
+    # layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
+    # layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
 
-    mesh = PGMeshCreator([layer1, layer2, layer3])
+    Layer = InclinedLayer()._construct_polygon
+    mesh = PGMeshCreator(Layer)
     plc = mesh.plc
 
     fig, ax = pg.plt.subplots()
