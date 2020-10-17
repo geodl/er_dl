@@ -368,7 +368,8 @@ class InclinedLayer(ResObject):
         box_pt4 = (-box_length * np.cos(np.deg2rad(angle)) + box_widht * np.sin(np.deg2rad(angle)) + box_pt0[0], \
                    -((-box_length * np.sin(np.deg2rad(angle)) - box_widht * np.cos(np.deg2rad(angle)) + box_pt0[1])))
         verts = [box_pt1, box_pt2, box_pt3, box_pt4]
-        return self.create_pg_world().intersection(verts)
+        world = Polygon(ResObject.get_world_pts())
+        return world.intersection(verts)
 
 
 class PGMeshCreator:
@@ -464,8 +465,8 @@ if __name__ == "__main__":
     # layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
     # layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
 
-    Layer = InclinedLayer()._construct_polygon
-    mesh = PGMeshCreator(Layer)
+    Layer = InclinedLayer()
+    mesh = PGMeshCreator(Layer._construct_polygon())
     plc = mesh.plc
 
     fig, ax = pg.plt.subplots()
