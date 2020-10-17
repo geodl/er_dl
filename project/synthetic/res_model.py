@@ -468,7 +468,6 @@ if __name__ == "__main__":
     Layer = InclinedLayer()
     mesh = PGMeshCreator(Layer._construct_polygon())
     plc = mesh.plc
-
     fig, ax = pg.plt.subplots()
     drawMesh(ax, plc)
     drawMesh(ax, mt.createMesh(plc))
