@@ -1,5 +1,5 @@
+'''checking for branching'''
 from typing import Union, Optional, List, Tuple
-
 import pygimli as pg
 import numpy as np
 from pygimli import meshtools as mt
