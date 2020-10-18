@@ -1,4 +1,4 @@
-from typing import Union, Optional, List, Tuple
+from typing import Union, Optional, List, Tuple, Iterable
 
 import pygimli as pg
 import numpy as np
@@ -6,6 +6,7 @@ from pygimli import meshtools as mt
 import random as rand
 from shapely.geometry import Polygon, MultiPolygon
 import geopandas as gpd
+import matplotlib.pyplot as plt
 
 
 ResType = Union[float, np.ndarray]
@@ -24,6 +25,12 @@ class ModelConfig:
         min_res = 10
         max_res = 10000
 
+    class ObjectGrid:
+        """
+        Discretize smooth objects with a step of "delta" meters.
+        """
+        delta = 10
+
     class World(ResValues):
         """
         Model world/background/underlay with dimensions.
@@ -41,7 +48,7 @@ class ModelConfig:
         height: thickness of layer in orthogonal direction
         depth: depth of top of layer
         """
-        min_height = 5
+        min_height = 10
         max_height = 100
         min_depth = 5
         max_depth = 50
@@ -106,6 +113,10 @@ class ModelConfig:
         max_width = 100
         min_depth = 20
         max_depth = 40
+        min_x_norm = 0
+        max_x_norm = 1
+        min_height_truncated_norm = 0.1
+        max_height_truncated_norm = 0.7
 
     class LayersContact(CurvedLayer):
         """
@@ -117,6 +128,10 @@ class ModelConfig:
         max_height = 40
         min_contact_angle = 20
         max_contact_angle = 90
+
+
+class OutOfModelObject:
+    pass
 
 
 class ResObject:
@@ -156,8 +171,10 @@ class ResObject:
             It can be represented as a collection of points.
             random: function that generates random values in a given range.
         """
+        self.random = np.random.uniform
+
         if resistivity is None:
-            self.resistivity = rand.randrange(ModelConfig.ResValues.min_res, ModelConfig.ResValues.max_res)
+            self.resistivity = self.random(ModelConfig.ResValues.min_res, ModelConfig.ResValues.max_res)
         else:
             self.resistivity = resistivity
 
@@ -167,7 +184,6 @@ class ResObject:
 
         self.marker = marker
         self.polygon = None
-        self.random = np.random.uniform
 
     def _gen_value_if_need(self, min_value: float, max_value: float, curr_value: float, include_negative: bool = False):
         """
@@ -182,6 +198,9 @@ class ResObject:
                 return self.random(min_value, max_value)
         else:
             return curr_value
+
+    def is_valid(self):
+        return not isinstance(self.get_polygon(), OutOfModelObject)
 
     def _construct_polygon(self):
         """
@@ -228,14 +247,16 @@ class ResObject:
                               marker=0)
 
     @classmethod
-    def get_world_pts(cls):
+    def get_world_pts(cls, negative_bottom: bool = True):
         """
         The method returns a set of corner points that constrain the dimensions of the model.
         """
+        sign = -1 if negative_bottom else 1
+
         return [[ModelConfig.World.left, ModelConfig.World.top],
                 [ModelConfig.World.right, ModelConfig.World.top],
-                [ModelConfig.World.right, -ModelConfig.World.bottom],
-                [ModelConfig.World.left, -ModelConfig.World.bottom]]
+                [ModelConfig.World.right, sign * ModelConfig.World.bottom],
+                [ModelConfig.World.left, sign * ModelConfig.World.bottom]]
 
     @staticmethod
     def _check_point_inside_model(pt: PointType):
@@ -284,6 +305,38 @@ class ResObject:
             else:
                 raise ValueError('Unrecognized point')
 
+    @classmethod
+    def _finalize_polygon(cls, polygon: Polygon):
+        world_polygon = Polygon(cls.get_world_pts(negative_bottom=False))
+        polygon = world_polygon.intersection(polygon)
+        verts = cls.get_values_from_polygon(polygon)
+
+        if len(verts) > 0:
+            verts = [(vert[0], -vert[1]) for vert in verts]
+            return Polygon(verts)
+        else:
+            return OutOfModelObject()
+
+    @classmethod
+    def show_poly(cls, polygons: Union[Polygon, Iterable[Polygon]]):
+        if not isinstance(polygons, Iterable) and isinstance(polygons, Polygon):
+            polygons = [polygons]
+
+        fig, ax = plt.subplots()
+
+        for poly in polygons:
+            xy = cls.get_values_from_polygon(poly, as_vectors=True)
+            ax.plot(*xy)
+        fig.show()
+
+    @classmethod
+    def get_values_from_polygon(cls, polygon: Polygon, as_vectors: bool = False):
+        coords = polygon.exterior.coords
+        if as_vectors:
+            return tuple(zip(*coords))
+        else:
+            return tuple(coords)
+
 
 class World(ResObject):
     def __init__(self, *args, **kwargs):
@@ -319,13 +372,12 @@ class HorizontalLayer(ResObject):
                                          ModelConfig.HorizontalLayer.max_height,
                                          self.height)
 
-        neg_depth = -depth
-        neg_height = -height
+        horizontal_layer = Polygon([[ModelConfig.World.left, depth],
+                                    [ModelConfig.World.right, depth],
+                                    [ModelConfig.World.right, depth + height],
+                                    [ModelConfig.World.left, depth + height]])
 
-        self.polygon = Polygon([[ModelConfig.World.left, neg_depth],
-                                [ModelConfig.World.right, neg_depth],
-                                [ModelConfig.World.right, neg_depth + neg_height],
-                                [ModelConfig.World.left, neg_depth + neg_height]])
+        self.polygon = self._finalize_polygon(horizontal_layer)
 
 
 class InclinedLayer(ResObject):
@@ -340,9 +392,9 @@ class InclinedLayer(ResObject):
         See "args" and "kwargs" description in parent class.
         """
         super().__init__(*args, **kwargs)
+        self.angle = angle
         self.depth = depth
         self.height = height
-        self.angle = angle
 
         self._construct_polygon()
 
@@ -363,35 +415,90 @@ class InclinedLayer(ResObject):
                                         True)
 
         if 0 <= angle <= 90:
-            upper_line_pt1 = (ModelConfig.World.right, depth)
-            upper_line_pt2 = self._calc_opposite_point_with_angle(upper_line_pt1, angle)
-            bottom_value = depth + height / np.cos(np.deg2rad(angle))
-
-            if bottom_value > ModelConfig.World.bottom:
-                rb_pt = (ModelConfig.World.right, ModelConfig.World.bottom)
-                verts = [upper_line_pt1, rb_pt, upper_line_pt2]
-            else:
-                lower_line_pt1 = (ModelConfig.World.right, bottom_value)
-                lower_line_pt2 = self._calc_opposite_point_with_angle(lower_line_pt1, angle)
-                verts = [upper_line_pt1, upper_line_pt2, lower_line_pt2, lower_line_pt1]
-
+            x_pos = ModelConfig.World.right
+            scalar_dx = -1
         elif -90 <= angle < 0:
-            upper_line_pt1 = (ModelConfig.World.left, depth)
-            upper_line_pt2 = self._calc_opposite_point_with_angle(upper_line_pt1, angle)
-            bottom_value = depth + height / np.cos(np.deg2rad(angle))
-
-            if bottom_value > ModelConfig.World.bottom:
-                lb_pt = (ModelConfig.World.left, ModelConfig.World.bottom)
-                verts = [upper_line_pt1, lb_pt, upper_line_pt2]
-            else:
-                lower_line_pt1 = (ModelConfig.World.left, bottom_value)
-                lower_line_pt2 = self._calc_opposite_point_with_angle(lower_line_pt1, angle)
-                verts = [upper_line_pt1, upper_line_pt2, lower_line_pt2, lower_line_pt1]
+            x_pos = ModelConfig.World.left
+            scalar_dx = 1
         else:
             raise ValueError("Angle must be between -90 and 90")
 
-        verts = [(vert[0], -vert[1]) for vert in verts]
-        self.polygon = Polygon(verts)
+        dx = scalar_dx * max(ModelConfig.World.right, ModelConfig.World.left) ** 2
+        dz = - np.tan(np.deg2rad(angle)) * dx
+
+        upper_line_pt1 = (x_pos, depth)
+        upper_line_pt2 = (upper_line_pt1[0] + dx, upper_line_pt1[1] + dz)
+
+        lower_line_pt1 = (x_pos, depth + height / np.cos(np.deg2rad(angle)))
+        lower_line_pt2 = (lower_line_pt1[0] + dx, lower_line_pt1[1] + dz)
+
+        layer_polygon = Polygon([upper_line_pt1, upper_line_pt2, lower_line_pt2, lower_line_pt1])
+
+        self.polygon = self._finalize_polygon(layer_polygon)
+
+
+class Lens(ResObject):
+    def __init__(self,
+                 depth: Optional[float] = None,
+                 height: Optional[float] = None,
+                 width: Optional[float] = None,
+                 x0: Optional[float] = None,
+                 trunc: Optional[float] = None,
+                 *args, **kwargs):
+        """
+        Class allow you create inclined layer with specified parameters.
+
+        See "args" and "kwargs" description in parent class.
+        """
+        super().__init__(*args, **kwargs)
+        self.depth = depth
+        self.height = height
+        self.width = width
+        self.x0 = x0
+        self.trunc = trunc
+
+        self._construct_polygon()
+
+    def _construct_polygon(self):
+        """
+        The method builds a polygon by calculating the coordinates of the top and bottom lines of the layer.
+        Since the layer is infinite, it touches one of the boundaries higher than the other.
+        """
+        depth = self._gen_value_if_need(ModelConfig.Lens.min_depth,
+                                        ModelConfig.Lens.max_depth,
+                                        self.depth)
+        height = self._gen_value_if_need(ModelConfig.Lens.min_height,
+                                         ModelConfig.Lens.max_height,
+                                         self.height)
+        width = self._gen_value_if_need(ModelConfig.Lens.min_width,
+                                        ModelConfig.Lens.max_width,
+                                        self.width)
+        x0 = self._gen_value_if_need(ModelConfig.World.right * ModelConfig.Lens.min_x_norm,
+                                     ModelConfig.World.right * ModelConfig.Lens.max_x_norm,
+                                     self.x0)
+        trunc = self._gen_value_if_need(ModelConfig.Lens.min_height_truncated_norm,
+                                        ModelConfig.Lens.max_height_truncated_norm,
+                                        self.trunc)
+
+        width /= 2
+
+        w_0 = width / np.sqrt(1 - trunc ** 2)
+        h_0 = height / (1 - trunc)
+
+        x_0 = x0
+        z_0 = depth - h_0 * trunc
+
+        x_l = x_0 - w_0 * np.sqrt(1 - trunc ** 2)
+        x_r = x_0 + w_0 * np.sqrt(1 - trunc ** 2)
+
+        # segments each "ModelConfig.ObjectGrid.delta" meters or minimum 5 parts
+        num_segments = max(int(x_r - x_l) // ModelConfig.ObjectGrid.delta, 5)
+        x = np.linspace(x_l, x_r, num_segments)
+        z = z_0 + h_0 * np.sqrt(1 - ((x - x_0) / w_0) ** 2)
+
+        lens_polygon = Polygon(tuple(zip(x, z)))
+
+        self.polygon = self._finalize_polygon(lens_polygon)
 
 
 class PGMeshCreator:
@@ -414,21 +521,16 @@ class PGMeshCreator:
             The primitives are stacked on top of each other with overlap.
             The number of formed polygons is equal to or greater than the number of the original primitives.
         """
-        if isinstance(resobjects_list, ResObject):
+
+        if isinstance(resobjects_list, (ResObject, OutOfModelObject)):
             resobjects_list = [resobjects_list]
 
         world_polygon = Polygon(ResObject.get_world_pts())
+        res_union = gpd.GeoDataFrame({'geometry': world_polygon, 'marker': [0]})
 
-        world = gpd.GeoDataFrame({'geometry': world_polygon, 'marker': [0]})
-        assert resobjects_list[0].marker is not None
-        first_poly = gpd.GeoDataFrame({'geometry': resobjects_list[0].get_polygon(),
-                                      'marker': [resobjects_list[0].marker]})
-
-        res_union = self.merge_two_polygons(world, first_poly)
-
-        if len(resobjects_list) > 1:
-            for extra_poly in resobjects_list[1:]:
-                assert extra_poly.marker is not None
+        for extra_poly in resobjects_list:
+            assert extra_poly.marker is not None
+            if extra_poly.is_valid():
                 extra_poly = gpd.GeoDataFrame({'geometry': extra_poly.get_polygon(),
                                                'marker': [extra_poly.marker]})
                 res_union = self.merge_two_polygons(res_union, extra_poly)
@@ -437,7 +539,7 @@ class PGMeshCreator:
 
         for _, rows in res_union.iterrows():
             if int(rows['marker']) != 0:
-                verts = tuple(zip(*rows['geometry'].exterior.xy))[:-1]
+                verts = tuple(rows['geometry'].exterior.coords)[:-1]
                 mesh_list.append(mt.createPolygon(verts, isClosed=True, marker=int(rows['marker'])))
 
         self.objects_list = resobjects_list
@@ -479,6 +581,7 @@ class PGMeshCreator:
 
 if __name__ == "__main__":
     from pygimli.viewer.mpl import drawMesh
+    from project.config import common_config
 
     rand.seed(1)
     np.random.seed(1)
@@ -486,9 +589,13 @@ if __name__ == "__main__":
     layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
     layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
     layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
+    layer4 = Lens(marker=3, width=150, height=50, x0=300, depth=30)
+    layer5 = Lens(marker=1, width=250, height=20, x0=700, depth=150)
 
-    mesh = PGMeshCreator([layer1, layer2, layer3])
+    mesh = PGMeshCreator([layer1, layer2, layer3, layer4, layer5])
     plc = mesh.plc
+
+    pg.meshtools.exportPLC(plc, common_config.root_dir / 'exmaple.dat')
 
     fig, ax = pg.plt.subplots()
     drawMesh(ax, plc)
