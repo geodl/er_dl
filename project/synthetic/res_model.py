@@ -327,6 +327,22 @@ class HorizontalLayer(ResObject):
 
 
 class InclinedLayer(ResObject):
+    def __init__(self,
+                 depth: Optional[float] = None,
+                 height: Optional[float] = None,
+                 angle: Optional[float] = None,
+                 *args, **kwargs):
+        """
+        Class allow you create inclined layer with specified parameters.
+        See "args" and "kwargs" description in parent class.
+        """
+        super().__init__(*args, **kwargs)
+        self.depth = depth
+        self.height = height
+        self.angle = angle
+
+        self._construct_polygon()
+
     def _construct_polygon(self):
         """
         The method builds a polygon by calculating the coordinates of the top and bottom lines of the layer.
@@ -367,7 +383,7 @@ class InclinedLayer(ResObject):
                    -((box_length * np.sin(np.deg2rad(angle)) + box_widht * np.cos(np.deg2rad(angle)) + box_pt0[1])))
         box_pt4 = (-box_length * np.cos(np.deg2rad(angle)) + box_widht * np.sin(np.deg2rad(angle)) + box_pt0[0], \
                    -((-box_length * np.sin(np.deg2rad(angle)) - box_widht * np.cos(np.deg2rad(angle)) + box_pt0[1])))
-        verts = [box_pt1, box_pt2, box_pt3, box_pt4]
+        verts = Polygon([box_pt1, box_pt2, box_pt3, box_pt4])
         world = Polygon(ResObject.get_world_pts())
         return world.intersection(verts)
 
