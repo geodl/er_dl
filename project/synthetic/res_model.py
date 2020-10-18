@@ -3,8 +3,9 @@ from typing import Union, Optional, List, Tuple, Iterable
 import pygimli as pg
 import numpy as np
 from pygimli import meshtools as mt
+from pygimli.core._pygimli_ import Mesh
 import random as rand
-from shapely.geometry import Polygon, MultiPolygon
+from shapely.geometry import Polygon, MultiPolygon, LineString
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
@@ -121,13 +122,13 @@ class ModelConfig:
     class LayersContact(CurvedLayer):
         """
         Composite transformation of multiple layers, connecting two layers of different resistance.
-        height: the thickness of the layers to be joined
         contact_angle: angle of inclination of the contact surface
         """
-        min_height = 10
-        max_height = 40
         min_contact_angle = 20
         max_contact_angle = 90
+        min_contact_position_norm = -1
+        max_contact_position_norm = 1
+
 
 
 class OutOfModelObject:
@@ -185,7 +186,11 @@ class ResObject:
         self.marker = marker
         self.polygon = None
 
-    def _gen_value_if_need(self, min_value: float, max_value: float, curr_value: float, include_negative: bool = False):
+    def _gen_value_if_need(self,
+                           min_value: float,
+                           max_value: float,
+                           curr_value: float,
+                           include_negative: bool = False) -> float:
         """
         Method check that "curr_value" is None. If True it generates random value between "min_value" and "max_value",
         including negative ones if "include_negative" is True. Otherwise, it returns the "curr_value".
@@ -199,7 +204,7 @@ class ResObject:
         else:
             return curr_value
 
-    def is_valid(self):
+    def is_valid(self) -> bool:
         return not isinstance(self.get_polygon(), OutOfModelObject)
 
     def _construct_polygon(self):
@@ -208,10 +213,10 @@ class ResObject:
         """
         pass
 
-    def get_polygon(self):
+    def get_polygon(self) -> Polygon:
         return self.polygon
 
-    def set_marker(self, marker: int):
+    def set_marker(self, marker: int) -> None:
         """
         The method allows you to change or assign a marker after creating an object.
         """
@@ -241,25 +246,25 @@ class ResObject:
         return int(x / z), int(y / z)
 
     @classmethod
-    def create_pg_world(cls):
+    def create_pg_world(cls) -> Mesh:
         return mt.createWorld(start=[ModelConfig.World.left, ModelConfig.World.top],
                               end=[ModelConfig.World.right, -ModelConfig.World.bottom],
                               marker=0)
 
     @classmethod
-    def get_world_pts(cls, negative_bottom: bool = True):
+    def get_world_pts(cls, negative_bottom: bool = True) -> Tuple[Tuple[float, float], ...]:
         """
         The method returns a set of corner points that constrain the dimensions of the model.
         """
         sign = -1 if negative_bottom else 1
 
-        return [[ModelConfig.World.left, ModelConfig.World.top],
-                [ModelConfig.World.right, ModelConfig.World.top],
-                [ModelConfig.World.right, sign * ModelConfig.World.bottom],
-                [ModelConfig.World.left, sign * ModelConfig.World.bottom]]
+        return ((ModelConfig.World.left, ModelConfig.World.top),
+                (ModelConfig.World.right, ModelConfig.World.top),
+                (ModelConfig.World.right, sign * ModelConfig.World.bottom),
+                (ModelConfig.World.left, sign * ModelConfig.World.bottom))
 
     @staticmethod
-    def _check_point_inside_model(pt: PointType):
+    def _check_point_inside_model(pt: PointType) -> bool:
         if ModelConfig.World.left <= pt[0] <= ModelConfig.World.right and \
                 ModelConfig.World.top <= pt[1] <= ModelConfig.World.bottom:
             return True
@@ -267,7 +272,7 @@ class ResObject:
             return False
 
     @classmethod
-    def _calc_opposite_point_with_angle(cls, pt: PointType, angle: float):
+    def _calc_opposite_point_with_angle(cls, pt: PointType, angle: float) -> PointType:
         """
         Finds a point on a boundary (left, right or bottom) that lies on a ray passing at a specified "angle" from
         the point "pt".
@@ -306,7 +311,7 @@ class ResObject:
                 raise ValueError('Unrecognized point')
 
     @classmethod
-    def _finalize_polygon(cls, polygon: Polygon):
+    def _finalize_polygon(cls, polygon: Polygon) -> Union[Polygon, OutOfModelObject]:
         world_polygon = Polygon(cls.get_world_pts(negative_bottom=False))
         polygon = world_polygon.intersection(polygon)
         verts = cls.get_values_from_polygon(polygon)
@@ -318,7 +323,7 @@ class ResObject:
             return OutOfModelObject()
 
     @classmethod
-    def show_poly(cls, polygons: Union[Polygon, Iterable[Polygon]]):
+    def show_poly(cls, polygons: Union[Polygon, Iterable[Polygon]]) -> None:
         if not isinstance(polygons, Iterable) and isinstance(polygons, Polygon):
             polygons = [polygons]
 
@@ -330,22 +335,34 @@ class ResObject:
         fig.show()
 
     @classmethod
-    def get_values_from_polygon(cls, polygon: Polygon, as_vectors: bool = False):
+    def get_values_from_polygon(cls,
+                                polygon: Polygon,
+                                as_vectors: bool = False) -> \
+            Union[Tuple[PointType, ...], Tuple[Tuple[float], Tuple[float]]]:
         coords = polygon.exterior.coords
         if as_vectors:
             return tuple(zip(*coords))
         else:
             return tuple(coords)
 
+    def get_geodataframe(self) -> gpd.GeoDataFrame:
+        return gpd.GeoDataFrame({'geometry': self.get_polygon(),
+                                 'marker': [self.marker]})
 
-class World(ResObject):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    @classmethod
+    def calc_distance(cls, pt_1: PointType, pt_2: PointType):
+        return np.sqrt((pt_1[0] - pt_2[0]) ** 2 + (pt_1[1] - pt_2[1]) ** 2)
 
-        self._construct_polygon()
+    @classmethod
+    def calc_angle(cls, pt_1: PointType, pt_2: PointType) -> float:
+        if pt_1[0] == pt_2[0]:
+            angle = 90.0
+        else:
+            tg = (pt_2[1] - pt_1[1]) / (pt_2[0] - pt_1[0])
+            angle = np.arccos(np.sqrt(1 / (1 + tg ** 2)))
+            angle = np.rad2deg(angle)
+        return angle
 
-    def _construct_polygon(self):
-        self.polygon = Polygon(self.get_world_pts())
 
 
 class HorizontalLayer(ResObject):
@@ -501,6 +518,68 @@ class Lens(ResObject):
         self.polygon = self._finalize_polygon(lens_polygon)
 
 
+class TransformedObject:
+    pass
+
+
+class ResistanceContactLayer(TransformedObject):
+    def __init__(self,
+                 markers: Tuple[int, int],
+                 angle: Optional[float] = None,
+                 contact_position_norm: Optional[float] = None,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.markers = markers
+        self.angle = angle
+        self.contact_position_norm = contact_position_norm
+
+        self.transformed_object = None
+
+    def _transform(self, res_object: ResObject):
+        # ResObject.show_poly(res_object.get_polygon())
+
+        poly = res_object.get_polygon()
+        print(poly)
+        print(poly.centroid)
+        rec = poly.minimum_rotated_rectangle
+        coords = ResObject.get_values_from_polygon(rec)[:-1]
+
+        pt_01 = np.mean([coords[0], coords[1]], axis=0)
+        pt_23 = np.mean([coords[2], coords[3]], axis=0)
+        pt_03 = np.mean([coords[0], coords[3]], axis=0)
+        pt_12 = np.mean([coords[1], coords[2]], axis=0)
+
+        dist_1 = ResObject.calc_distance(pt_01, pt_23)
+        dist_2 = ResObject.calc_distance(pt_03, pt_12)
+
+        if dist_1 > dist_2:
+            line
+
+
+        print(dist_1, dist_2)
+
+
+        ResObject.show_poly([poly, rec])
+        # print(poly.cen)
+
+
+    def __call__(self, res_object: ResObject):
+        return self._transform(res_object)
+
+
+layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
+rr = ResistanceContactLayer(markers=(1, 2), angle=20, contact_position_norm=0.5)
+
+rr(layer1)
+
+
+
+
+
+
+
+
+
 class PGMeshCreator:
     def __init__(self, resobjects_list: Union[ResObject, List[ResObject]]):
         """
@@ -531,8 +610,7 @@ class PGMeshCreator:
         for extra_poly in resobjects_list:
             assert extra_poly.marker is not None
             if extra_poly.is_valid():
-                extra_poly = gpd.GeoDataFrame({'geometry': extra_poly.get_polygon(),
-                                               'marker': [extra_poly.marker]})
+                extra_poly = extra_poly.get_geodataframe()
                 res_union = self.merge_two_polygons(res_union, extra_poly)
 
         mesh_list = [ResObject.create_pg_world()]
@@ -586,18 +664,20 @@ if __name__ == "__main__":
     rand.seed(1)
     np.random.seed(1)
 
-    layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
-    layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
-    layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
-    layer4 = Lens(marker=3, width=150, height=50, x0=300, depth=30)
-    layer5 = Lens(marker=1, width=250, height=20, x0=700, depth=150)
-
-    mesh = PGMeshCreator([layer1, layer2, layer3, layer4, layer5])
-    plc = mesh.plc
-
-    pg.meshtools.exportPLC(plc, common_config.root_dir / 'exmaple.dat')
-
-    fig, ax = pg.plt.subplots()
-    drawMesh(ax, plc)
-    drawMesh(ax, mt.createMesh(plc))
-    pg.wait()
+    # layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
+    # layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
+    # layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
+    # layer4 = Lens(marker=3, width=150, height=50, x0=300, depth=30)
+    # layer5 = Lens(marker=1, width=250, height=20, x0=700, depth=150)
+    #
+    # mesh = PGMeshCreator([layer1, layer2, layer3, layer4, layer5])
+    # plc = mesh.plc
+    #
+    # print(type(plc))
+    #
+    # pg.meshtools.exportPLC(plc, common_config.root_dir / 'exmaple.dat')
+    #
+    # fig, ax = pg.plt.subplots()
+    # drawMesh(ax, plc)
+    # drawMesh(ax, mt.createMesh(plc))
+    # pg.wait()
