@@ -5,6 +5,7 @@ import numpy as np
 from pygimli import meshtools as mt
 from pygimli.core._pygimli_ import Mesh
 import random as rand
+from shapely.affinity import rotate, translate
 from shapely.geometry import Polygon, MultiPolygon, LineString
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -73,6 +74,10 @@ class ModelConfig:
         max_height_curve = 15
         min_width_curve = 10
         max_width_curve = 100
+        min_norm_pos = 0
+        max_norm_pos = 1
+        min_segments = 3
+        max_segments = 15
 
     class Wedge(ResValues):
         """
@@ -118,6 +123,10 @@ class ModelConfig:
         max_x_norm = 1
         min_height_truncated_norm = 0.1
         max_height_truncated_norm = 0.7
+        min_angle = 0
+        max_angle = 45
+        allow_symmetric = True
+
 
     class LayersContact(CurvedLayer):
         """
@@ -364,7 +373,6 @@ class ResObject:
         return angle
 
 
-
 class HorizontalLayer(ResObject):
     def __init__(self,
                  depth: Optional[float] = None,
@@ -431,27 +439,199 @@ class InclinedLayer(ResObject):
                                         self.angle,
                                         True)
 
-        if 0 <= angle <= 90:
-            x_pos = ModelConfig.World.right
-            scalar_dx = -1
-        elif -90 <= angle < 0:
-            x_pos = ModelConfig.World.left
-            scalar_dx = 1
+        extra_x = max(ModelConfig.World.right, ModelConfig.World.bottom) ** 3
+
+
+        horizontal_layer = Polygon([[ModelConfig.World.left - extra_x, depth],
+                                    [ModelConfig.World.right + extra_x, depth],
+                                    [ModelConfig.World.right + extra_x, depth + height],
+                                    [ModelConfig.World.left - extra_x, depth + height]])
+
+        inclined_layer = rotate(horizontal_layer, angle)
+
+        if 0 <= angle < 90:
+            x_border = ModelConfig.World.left
+        elif -90 < angle < 0:
+            x_border = ModelConfig.World.right
         else:
-            raise ValueError("Angle must be between -90 and 90")
+            raise ValueError('Angle must be between -90 and 90 except one')
 
-        dx = scalar_dx * max(ModelConfig.World.right, ModelConfig.World.left) ** 2
-        dz = - np.tan(np.deg2rad(angle)) * dx
+        pt1_border = (x_border, ModelConfig.World.bottom)
+        pt2_border = (x_border, ModelConfig.World.top)
 
-        upper_line_pt1 = (x_pos, depth)
-        upper_line_pt2 = (upper_line_pt1[0] + dx, upper_line_pt1[1] + dz)
+        pts_inclined = self.get_values_from_polygon(inclined_layer)
+        pt1_upper, pt2_upper = pts_inclined[:2]
 
-        lower_line_pt1 = (x_pos, depth + height / np.cos(np.deg2rad(angle)))
-        lower_line_pt2 = (lower_line_pt1[0] + dx, lower_line_pt1[1] + dz)
+        _, z_min = self._get_intersection_point(pt1_border, pt2_border, pt1_upper, pt2_upper)
+        delta_z = depth - z_min
+        pts_inclined_shifted = [(val[0], val[1] + delta_z) for val in pts_inclined]
 
-        layer_polygon = Polygon([upper_line_pt1, upper_line_pt2, lower_line_pt2, lower_line_pt1])
+        poly_inclined_shifted = Polygon(pts_inclined_shifted)
 
-        self.polygon = self._finalize_polygon(layer_polygon)
+        self.polygon = self._finalize_polygon(poly_inclined_shifted)
+
+
+class Buldge(ResObject):
+    def __init__(self,
+                 depth: Optional[float] = None,
+                 height: Optional[float] = None,
+                 height_curve: Optional[float] = None,
+                 width_curve: Optional[float] = None,
+                 angle: Optional[float] = None,
+                 seed_buldge: Optional[int] = None,
+                 norm_pos: Optional[float] = None,
+                 num_segments: Optional[int] = None,
+                 *args, **kwargs):
+        """
+        Class allow you create inclined layer with specified parameters.
+
+        See "args" and "kwargs" description in parent class.
+        """
+        super().__init__(*args, **kwargs)
+        self.angle = angle
+        self.depth = depth
+        self.height = height
+        self.height_curve = height_curve
+        self.width_curve = width_curve
+        self.seed_buldge = seed_buldge
+        self.norm_pos = norm_pos
+        self.num_segments = num_segments
+        self._max_seed = 10000
+
+        self._construct_polygon()
+
+    def _construct_polygon(self):
+        """
+        The method builds a polygon by calculating the coordinates of the top and bottom lines of the layer.
+        Since the layer is infinite, it touches one of the boundaries higher than the other.
+        """
+        depth = self._gen_value_if_need(ModelConfig.CurvedLayer.min_depth,
+                                        ModelConfig.CurvedLayer.max_depth,
+                                        self.depth)
+        height = self._gen_value_if_need(ModelConfig.CurvedLayer.min_height,
+                                         ModelConfig.CurvedLayer.max_height,
+                                         self.height)
+        height_curve = self._gen_value_if_need(ModelConfig.CurvedLayer.min_height_curve,
+                                               ModelConfig.CurvedLayer.max_height_curve,
+                                               self.height_curve)
+        width_curve = self._gen_value_if_need(ModelConfig.CurvedLayer.min_width_curve,
+                                              ModelConfig.CurvedLayer.max_width_curve,
+                                              self.width_curve)
+        angle = self._gen_value_if_need(ModelConfig.CurvedLayer.min_angle,
+                                        ModelConfig.CurvedLayer.max_angle,
+                                        self.angle,
+                                        True)
+        norm_pos = self._gen_value_if_need(ModelConfig.CurvedLayer.min_norm_pos,
+                                           ModelConfig.CurvedLayer.max_norm_pos,
+                                           self.norm_pos)
+        num_segments = self._gen_value_if_need(ModelConfig.CurvedLayer.min_segments,
+                                               ModelConfig.CurvedLayer.max_segments,
+                                               self.num_segments)
+
+        if self.seed_buldge is not None:
+            seed_buldge = self.seed_buldge
+        else:
+            seed_buldge = int(self.random(0, self._max_seed))
+
+        extra_x = max(ModelConfig.World.right, ModelConfig.World.bottom) ** 3
+
+        horizontal_layer = Polygon([[ModelConfig.World.left - extra_x, depth],
+                                    [ModelConfig.World.right + extra_x, depth],
+                                    [ModelConfig.World.right + extra_x, depth + height],
+                                    [ModelConfig.World.left - extra_x, depth + height]])
+
+        inclined_layer = rotate(horizontal_layer, angle)
+
+        if 0 <= angle < 90:
+            x_border = ModelConfig.World.left
+        elif -90 < angle < 0:
+            x_border = ModelConfig.World.right
+        else:
+            raise ValueError('Angle must be between -90 and 90 except one')
+
+        pt1_border = (x_border, ModelConfig.World.bottom)
+        pt2_border = (x_border, ModelConfig.World.top)
+
+        pts_inclined = self.get_values_from_polygon(inclined_layer)
+        pt1_upper, pt2_upper = pts_inclined[:2]
+
+        _, z_min = self._get_intersection_point(pt1_border, pt2_border, pt1_upper, pt2_upper)
+        delta_z = depth - z_min
+        pts_inclined_shifted = [(val[0], val[1] + delta_z) for val in pts_inclined]
+
+        poly_inclined_shifted = Polygon(pts_inclined_shifted)
+
+        poly_inclined_shifted = self._finalize_polygon(poly_inclined_shifted)
+        self.show_poly(poly_inclined_shifted)
+
+        if isinstance(poly_inclined_shifted, OutOfModelObject):
+            self.polygon = OutOfModelObject()
+        else:
+            pts_inclined_shifted = [(val[0], -val[1]) for val in self.get_values_from_polygon(poly_inclined_shifted)]
+            pts_inclined_shifted = np.array(pts_inclined_shifted)
+
+            if angle >= 0:
+                z_values = pts_inclined_shifted[:, 1]
+                idx_min = z_values == min(z_values)
+                top_points = pts_inclined_shifted[idx_min, :]
+
+                x_values = top_points[:, 0]
+                idx_max = np.argmax(x_values)
+                top_point = top_points[idx_max]
+
+                x_values = pts_inclined_shifted[:, 0]
+                idx_max = x_values == max(x_values)
+                bottom_points = pts_inclined_shifted[idx_max, :]
+
+                z_values = bottom_points[:, 1]
+                idx_min = np.argmin(z_values)
+                bottom_point = bottom_points[idx_min]
+            else:
+                raise NotImplemented()
+
+            prev_seed = np.random.get_state()
+
+            np.random.seed(seed_buldge)
+            buldge_pts_x = np.sort(self.random(0, width_curve, int(num_segments)))
+
+            sigma = num_segments / 4
+            x_gaus = np.linspace(0, num_segments, num_segments)
+            buldge_pts_z = height_curve * np.exp(-((x_gaus - num_segments // 2) / sigma) ** 2)
+
+            delta_random_z = self.random(-height_curve * 0.1, height_curve * 0.1, int(num_segments))
+
+            np.random.set_state(prev_seed)
+
+            buldge_pts_z += delta_random_z
+
+            buldge_pts_x[0] = 0
+            buldge_pts_z[0] = 0
+            buldge_pts_z[-1] = 0
+
+            buldge_pts_z = np.clip(buldge_pts_z, 0, height_curve)
+            self_intersection = buldge_pts_z != 0
+            self_intersection[0] = True
+            self_intersection[-1] = True
+
+            buldge_pts_x = buldge_pts_x[self_intersection]
+            buldge_pts_z = buldge_pts_z[self_intersection]
+
+            pts_buldge = tuple(zip(buldge_pts_x, buldge_pts_z))
+
+            poly_buldge = Polygon(pts_buldge)
+            poly_buldge = rotate(poly_buldge, angle, (0, 0))
+
+            x_buldge, z_buldge = np.sum(np.vstack([top_point, bottom_point]), axis=0) * norm_pos
+
+            poly_buldge = translate(poly_buldge, x_buldge, z_buldge + 0.1)
+
+            self.show_poly(poly_buldge)
+            pts_inclined_shifted = Polygon(pts_inclined_shifted).union(poly_buldge)
+
+            self.show_poly(self._finalize_polygon(pts_inclined_shifted))
+
+
+Buldge(angle=10, depth=-10, height=1, num_segments=10, norm_pos=0.5, seed_buldge=100, width_curve=200, height_curve=100)
 
 
 class Lens(ResObject):
@@ -460,7 +640,9 @@ class Lens(ResObject):
                  height: Optional[float] = None,
                  width: Optional[float] = None,
                  x0: Optional[float] = None,
+                 angle: Optional[float] = None,
                  trunc: Optional[float] = None,
+                 symmetric: Optional[bool] = None,
                  *args, **kwargs):
         """
         Class allow you create inclined layer with specified parameters.
@@ -472,7 +654,9 @@ class Lens(ResObject):
         self.height = height
         self.width = width
         self.x0 = x0
+        self.angle = angle
         self.trunc = trunc
+        self.symmetric = symmetric
 
         self._construct_polygon()
 
@@ -496,6 +680,15 @@ class Lens(ResObject):
         trunc = self._gen_value_if_need(ModelConfig.Lens.min_height_truncated_norm,
                                         ModelConfig.Lens.max_height_truncated_norm,
                                         self.trunc)
+        angle = self._gen_value_if_need(ModelConfig.Lens.min_angle,
+                                        ModelConfig.Lens.max_angle,
+                                        self.angle)
+        if self.symmetric is not None:
+            symmetric = bool(self.symmetric)
+        elif ModelConfig.Lens.allow_symmetric:
+            symmetric = True if self.random(0, 1) > 0.5 else False
+        else:
+            symmetric = False
 
         width /= 2
 
@@ -513,134 +706,17 @@ class Lens(ResObject):
         x = np.linspace(x_l, x_r, num_segments)
         z = z_0 + h_0 * np.sqrt(1 - ((x - x_0) / w_0) ** 2)
 
+        # TODO: replace h to 2 * h for symmetric
+        if symmetric:
+            extra_x = x[::-1]
+            extra_z = 2 * min(z) - z
+            x = np.hstack([x, extra_x])
+            z = np.hstack([z, extra_z])
+
         lens_polygon = Polygon(tuple(zip(x, z)))
+        lens_polygon = rotate(lens_polygon, angle, (x_0, depth))
 
         self.polygon = self._finalize_polygon(lens_polygon)
-
-
-class TransformedObject:
-    pass
-
-
-class ResistanceContactLayer(TransformedObject):
-    def __init__(self,
-                 markers: Tuple[int, int],
-                 angle: Optional[float] = None,
-                 contact_position_norm: Optional[float] = None,
-                 *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.markers = markers
-        self.angle = angle
-        self.contact_position_norm = contact_position_norm
-
-        self.transformed_object = None
-
-    def _transform(self, res_object: ResObject):
-        # ResObject.show_poly(res_object.get_polygon())
-
-        poly = res_object.get_polygon()
-        print(poly)
-        print(poly.centroid)
-        rec = poly.minimum_rotated_rectangle
-        coords = ResObject.get_values_from_polygon(rec)[:-1]
-
-        pt_01 = np.mean([coords[0], coords[1]], axis=0)
-        pt_23 = np.mean([coords[2], coords[3]], axis=0)
-        pt_03 = np.mean([coords[0], coords[3]], axis=0)
-        pt_12 = np.mean([coords[1], coords[2]], axis=0)
-
-        dist_1 = ResObject.calc_distance(pt_01, pt_23)
-        dist_2 = ResObject.calc_distance(pt_03, pt_12)
-
-        if dist_1 >= dist_2:
-            pts = [pt_01, pt_23]
-            l = dist_1
-        else:
-            pts = [pt_03, pt_12]
-            l = dist_2
-
-        print(pts)
-        pt_center = np.mean(pts, axis=0)
-        print(pt_center)
-
-        # L = max(ModelConfig.World.right, ModelConfig.World.left) ** 3
-        L = 2
-        l = ResObject.calc_distance(*pts)
-
-        print(l)
-
-        x1, z1 = pts[1] - pt_center
-
-        z_l = -L / l * x1
-
-        x_l = np.sqrt(L ** 2 - z_l)
-
-        x_l += pt_center[0]
-        z_l += pt_center[1]
-
-        res = (x_l, z_l)
-
-
-        # angle = np.deg2rad(45)
-        #
-        # def equations(pt):
-        #     x, z = pt - pt_center
-        #     x1, z1 = pts[1] - pt_center
-        #     eq1 = x * x1 + z * z1 - np.cos(angle) * l * L
-        #     eq2 = x ** 2 + z ** 2 - L ** 2
-        #     return eq1, eq2
-        #
-        # from scipy.optimize import fsolve
-        #
-        # res = fsolve(equations, pt_center)
-        #
-        # print(res)
-
-
-
-        # z = (pts[1][1] * L * np.cos(angle) - pts[1][0] * L * np.sin(angle)) / l
-        # x = np.sqrt(L ** 2 - z ** 2)
-        #
-        # x += pt_center[0]
-        # z += pt_center[1]
-        #
-
-        vector_1 = pts[1] - pt_center
-        vector_2 = res - pt_center
-
-        unit_vector_1 = vector_1 / np.linalg.norm(vector_1)
-        unit_vector_2 = vector_2 / np.linalg.norm(vector_2)
-        dot_product = np.dot(unit_vector_1, unit_vector_2)
-        angle = np.arccos(dot_product)
-
-        print(np.rad2deg(angle))
-        #
-        # # print(x, z)
-        #
-        #
-        #
-        # print(dist_1, dist_2)
-
-
-        ResObject.show_poly([poly, rec])
-        # print(poly.cen)
-
-
-    def __call__(self, res_object: ResObject):
-        return self._transform(res_object)
-
-
-layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
-rr = ResistanceContactLayer(markers=(1, 2), angle=20, contact_position_norm=0.5)
-
-rr(layer1)
-
-
-
-
-
-
-
 
 
 class PGMeshCreator:
@@ -727,20 +803,39 @@ if __name__ == "__main__":
     rand.seed(1)
     np.random.seed(1)
 
-    # layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
-    # layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
-    # layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
-    # layer4 = Lens(marker=3, width=150, height=50, x0=300, depth=30)
-    # layer5 = Lens(marker=1, width=250, height=20, x0=700, depth=150)
-    #
-    # mesh = PGMeshCreator([layer1, layer2, layer3, layer4, layer5])
-    # plc = mesh.plc
-    #
-    # print(type(plc))
-    #
-    # pg.meshtools.exportPLC(plc, common_config.root_dir / 'exmaple.dat')
-    #
-    # fig, ax = pg.plt.subplots()
-    # drawMesh(ax, plc)
-    # drawMesh(ax, mt.createMesh(plc))
-    # pg.wait()
+    # TODO: fix error when no poly on world
+
+    for _ in range(2):
+        num_layers = np.random.randint(5)
+        uniq_markers = 3
+        markers = np.random.randint(1, uniq_markers, num_layers)
+
+        layers = []
+
+        for marker in markers:
+            layers.append(InclinedLayer(marker=int(marker)))
+
+        mesh = PGMeshCreator(layers)
+
+
+        # layer1 = InclinedLayer(angle=-12, height=100, marker=1, depth=-40)
+        # layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
+        # layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
+        # # layer4 = Lens(marker=3, width=150, height=50, x0=300, depth=100, angle=90)
+        # # layer5 = Lens(marker=1, width=250, height=20, x0=700, depth=150, symmetric=True, angle=180)
+        # # layer6 = Lens(marker=6, width=2500, height=100, x0=-100, depth=50, symmetric=True, angle=4, trunc=0.99)
+        #
+        # mesh = PGMeshCreator([
+        #
+        #     layer1, layer2, layer3,
+        # #     layer4, layer5,
+        # # layer6
+        # ])
+        plc = mesh.plc
+
+        # pg.meshtools.exportPLC(plc, common_config.root_dir / 'exmaple.dat')
+
+        fig, ax = pg.plt.subplots()
+        drawMesh(ax, plc)
+        drawMesh(ax, mt.createMesh(plc))
+        pg.wait()
