@@ -552,11 +552,74 @@ class ResistanceContactLayer(TransformedObject):
         dist_1 = ResObject.calc_distance(pt_01, pt_23)
         dist_2 = ResObject.calc_distance(pt_03, pt_12)
 
-        if dist_1 > dist_2:
-            line
+        if dist_1 >= dist_2:
+            pts = [pt_01, pt_23]
+            l = dist_1
+        else:
+            pts = [pt_03, pt_12]
+            l = dist_2
+
+        print(pts)
+        pt_center = np.mean(pts, axis=0)
+        print(pt_center)
+
+        # L = max(ModelConfig.World.right, ModelConfig.World.left) ** 3
+        L = 2
+        l = ResObject.calc_distance(*pts)
+
+        print(l)
+
+        x1, z1 = pts[1] - pt_center
+
+        z_l = -L / l * x1
+
+        x_l = np.sqrt(L ** 2 - z_l)
+
+        x_l += pt_center[0]
+        z_l += pt_center[1]
+
+        res = (x_l, z_l)
 
 
-        print(dist_1, dist_2)
+        # angle = np.deg2rad(45)
+        #
+        # def equations(pt):
+        #     x, z = pt - pt_center
+        #     x1, z1 = pts[1] - pt_center
+        #     eq1 = x * x1 + z * z1 - np.cos(angle) * l * L
+        #     eq2 = x ** 2 + z ** 2 - L ** 2
+        #     return eq1, eq2
+        #
+        # from scipy.optimize import fsolve
+        #
+        # res = fsolve(equations, pt_center)
+        #
+        # print(res)
+
+
+
+        # z = (pts[1][1] * L * np.cos(angle) - pts[1][0] * L * np.sin(angle)) / l
+        # x = np.sqrt(L ** 2 - z ** 2)
+        #
+        # x += pt_center[0]
+        # z += pt_center[1]
+        #
+
+        vector_1 = pts[1] - pt_center
+        vector_2 = res - pt_center
+
+        unit_vector_1 = vector_1 / np.linalg.norm(vector_1)
+        unit_vector_2 = vector_2 / np.linalg.norm(vector_2)
+        dot_product = np.dot(unit_vector_1, unit_vector_2)
+        angle = np.arccos(dot_product)
+
+        print(np.rad2deg(angle))
+        #
+        # # print(x, z)
+        #
+        #
+        #
+        # print(dist_1, dist_2)
 
 
         ResObject.show_poly([poly, rec])
