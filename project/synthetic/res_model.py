@@ -9,6 +9,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 
 
+
 ResType = Union[float, np.ndarray]
 PointType = Union[Tuple[float, float], np.ndarray]  # point coordinates sorted in (x, y) order
 
@@ -224,7 +225,7 @@ class ResObject:
         x, y, z = np.cross(l1, l2)  # point of intersection
         if z == 0:  # lines are parallel
             return None
-        return int(x / z), int(y / z)
+        return (x / z), (y / z)
 
     @classmethod
     def create_pg_world(cls):
@@ -293,6 +294,17 @@ class ResObject:
 
     def is_valid(self):
         return not isinstance(self.get_polygon(), OutOfModelObject)
+
+    @classmethod
+    def get_values_with_border(cls, min_value: int or float, max_value: int or float, number: int, start=0):
+        values = []
+        last = 0
+        for num in range(number):
+            max_value_num = max_value - last - min_value * (number - num - 1)
+            value = start + rand.uniform(min_value, max_value_num)
+            values.append(value)
+            last += value
+        return values
 
     @classmethod
     def _finalize_polygon(cls, polygon: Polygon):
@@ -432,8 +444,118 @@ class InclinedLayer(ResObject):
 
         self.polygon = self._finalize_polygon(layer_polygon)
 
-class Buldge(ResObject):
+class Сurvature(ResObject):
 
+
+    def get_rotate_line(self):
+        extra_x = self.extra_x
+        depth = self.depth
+        angle = self.angle
+        world = self.world
+
+        line = LineString([[ModelConfig.World.left - extra_x, depth], [ModelConfig.World.right + extra_x, depth]])
+        line = shapely.affinity.rotate(geom=line, angle=angle)
+        coords_of_line = np.array(line).tolist()
+        if 0 <= angle <= 90:
+            border = LineString([[ModelConfig.World.right, 1], [ModelConfig.World.right, 0]])
+        elif -90 <= angle < 0:
+            border = LineString([[ModelConfig.World.left, 1], [ModelConfig.World.left, 0]])
+        else:
+            raise ValueError("Ange must be between -90 and 90")
+
+
+        coords_of_lines = coords_of_line + np.array(border).tolist()
+        min_point = (ResObject._get_intersection_point(coords_of_lines[0], coords_of_lines[1],
+                                                       coords_of_lines[2], coords_of_lines[3]))[1]
+        dz_line = -depth + min_point
+        coords_of_line = [(coord[0], coord[1] - dz_line) for coord in coords_of_line]
+        line = LineString(coords_of_line)
+
+        coords_of_intersection = np.array(world.intersection(line)).tolist()
+        self.coords_of_line = coords_of_line
+        self.coord_for_x0 = coords_of_intersection[0][0], coords_of_intersection[1][0]
+
+    def get_coords_of_rotate_buldge_on_line(self):
+        coord_for_x0 = self.coord_for_x0
+        coords_of_line = self.coords_of_line
+        angle = self.angle
+
+        coord_0 = [self._gen_value_if_need(coord_for_x0[0], coord_for_x0[1], self.start), 0]
+        value = ResObject.get_values_with_border(min_value=ModelConfig.CurvedLayer.min_width_curve,
+                                    max_value=ModelConfig.CurvedLayer.max_width_curve, number=3, start=coord_0[0])
+        print(value)
+        coord_0 = [self._gen_value_if_need(coord_for_x0[0], coord_for_x0[1], self.start), 0]
+        coord_1 = [value[0], self._gen_value_if_need(ModelConfig.CurvedLayer.min_height_curve,
+                                                                      ModelConfig.CurvedLayer.max_height_curve,
+                                                                      self.height_curve)]
+        coord_2 = [value[1], self._gen_value_if_need(ModelConfig.CurvedLayer.min_height_curve,
+                                                                      ModelConfig.CurvedLayer.max_height_curve,
+                                                                      self.height_curve)]
+        coord_3 = [value[2], 0]
+
+        buldge = Polygon([coord_0, coord_1, coord_2, coord_3, coord_0])
+        buldge = shapely.affinity.rotate(geom=buldge, angle=angle)
+        coords_of_rotate_buldge = ResObject.get_values_from_polygon(buldge)
+        x0_rotate = coords_of_rotate_buldge[0][0]
+        y0_rotate = coords_of_rotate_buldge[0][1]
+        y0_rotate_on_line = ResObject._get_intersection_point((x0_rotate, 0), (x0_rotate, 1),
+                                                              coords_of_line[0], coords_of_line[1])[1]
+        dz_buldge = abs(y0_rotate_on_line - y0_rotate) * np.cos(np.radians(angle))
+
+        self.coords_of_rotate_curve = [[coord[0], coord[1] - dz_buldge] for coord in coords_of_rotate_buldge]
+
+    def get_coords_of_rotate_pinch_on_line(self):
+        coord_for_x0 = self.coord_for_x0
+        coords_of_line = self.coords_of_line
+        angle = self.angle
+        x_1 = rand.uniform(ModelConfig.CurvedLayer.min_width_curve, ModelConfig.CurvedLayer.max_width_curve)
+        x_2 = rand.uniform(ModelConfig.CurvedLayer.min_width_curve, ModelConfig.CurvedLayer.max_width_curve - x_1)
+        x_3 = rand.uniform(ModelConfig.CurvedLayer.min_width_curve, ModelConfig.CurvedLayer.max_width_curve - x_2)
+
+        coord_0 = [self._gen_value_if_need(coord_for_x0[0], coord_for_x0[1], self.start), 0]
+        coord_1 = [coord_0[0] + x_1, -self._gen_value_if_need(ModelConfig.CurvedLayer.min_height_curve,
+                                                                      ModelConfig.CurvedLayer.max_height_curve,
+                                                                      self.height_curve)]
+        coord_2 = [coord_1[0] + x_2, -self._gen_value_if_need(ModelConfig.CurvedLayer.min_height_curve,
+                                                                      ModelConfig.CurvedLayer.max_height_curve,
+                                                                      self.height_curve)]
+        coord_3 = [coord_2[0] + x_3, 0]
+
+        pinch = Polygon([coord_0, coord_1, coord_2, coord_3, coord_0])
+        pinch = shapely.affinity.rotate(geom=pinch, angle=angle)
+        coords_of_rotate_buldge = ResObject.get_values_from_polygon(pinch)
+        x0_rotate = coords_of_rotate_buldge[0][0]
+        y0_rotate = coords_of_rotate_buldge[0][1]
+        y0_rotate_on_line = ResObject._get_intersection_point((x0_rotate, 0), (x0_rotate, 1),
+                                                              coords_of_line[0], coords_of_line[1])[1]
+        dz_pinch = abs(y0_rotate_on_line - y0_rotate) * np.cos(np.radians(angle))
+
+        self.coords_of_rotate_curve = [[coord[0], coord[1] - dz_pinch] for coord in coords_of_rotate_buldge]
+
+    def _construct_polygon(self, include_curve=False):
+        coords_of_line = self.coords_of_line
+        height = self.height
+        world = self.world
+        coords_of_rotate_curve = self.coords_of_rotate_curve
+        coords_of_line = [list(coord) for coord in coords_of_line]
+        left_lower_coord = [[coords_of_line[0][0], coords_of_line[0][1] + height]]
+        right_lower_coord = [[coords_of_line[1][0], coords_of_line[1][1] + height]]
+
+        if include_curve:
+            coords_for_polygon = [coords_of_line[0]] + [coords_of_rotate_curve[0]] + [coords_of_rotate_curve[1]] + \
+                  [coords_of_rotate_curve[2]] + [coords_of_rotate_curve[3]] + [coords_of_line[1]] + \
+                  right_lower_coord + left_lower_coord + [coords_of_line[0]]
+        else:
+            coords_for_polygon = [coords_of_line[0]] + [coords_of_line[1]] + \
+                                 right_lower_coord + left_lower_coord + [coords_of_line[0]]
+
+        polygon = Polygon(coords_for_polygon)
+        polygon = polygon.intersection(world)
+        self.polygon = polygon
+        # self.show_poly(polygon)
+
+
+class Buldge(Сurvature):
     def __init__(self,
                  depth: Optional[float] = None,
                  height: Optional[float] = None,
@@ -444,93 +566,51 @@ class Buldge(ResObject):
                  *args, **kwargs):
 
         super().__init__(*args, **kwargs)
-        self.depth = depth
-        self.height = height
-        self.angle = angle
+        self.depth = -self._gen_value_if_need(ModelConfig.InclinedLayer.min_depth,
+                                    ModelConfig.InclinedLayer.max_depth, depth)
+        self.height = -self._gen_value_if_need(ModelConfig.InclinedLayer.min_height,
+                                     ModelConfig.InclinedLayer.max_height,height)
+        self.angle = self._gen_value_if_need(ModelConfig.InclinedLayer.min_angle,
+                                    ModelConfig.InclinedLayer.max_angle, angle, True)
+        self.world = Polygon(ResObject.get_world_pts())
         self.extra_x = extra_x
         self.start = start
         self.height_curve = height_curve
-        self._construct_polygon()
+        self.get_rotate_line()
+        self.get_coords_of_rotate_buldge_on_line()
+        self._construct_polygon(include_curve=True)
+
+class Pinch(Сurvature):
+    def __init__(self,
+                 depth: Optional[float] = None,
+                 height: Optional[float] = None,
+                 angle: Optional[float] = None,
+                 start: Optional[float] = None,
+                 height_curve: Optional[float] = None,
+                 extra_x: Optional[float] = 10000.0,
+                 *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+        self.depth = -self._gen_value_if_need(ModelConfig.InclinedLayer.min_depth,
+                                    ModelConfig.InclinedLayer.max_depth, depth)
+        self.height = -self._gen_value_if_need(ModelConfig.InclinedLayer.min_height,
+                                     ModelConfig.InclinedLayer.max_height,height)
+        self.angle = self._gen_value_if_need(ModelConfig.InclinedLayer.min_angle,
+                                    ModelConfig.InclinedLayer.max_angle, angle, True)
+        self.world = Polygon(ResObject.get_world_pts())
+        self.extra_x = extra_x
+        self.start = start
+        self.height_curve = height_curve
+        self.get_rotate_line()
+        self.get_coords_of_rotate_pinch_on_line()
+        self._construct_polygon(include_curve=True)
+
+
+poly = Pinch(angle=30,depth=30, height=30,)
+ResObject.show_poly(poly)
 
 
 
-    def _construct_polygon(self):
-        """
-        The method builds x_1 polygon by calculating the coordinates of the top and bottom lines of the layer.
-        Since the layer is infinite, it touches one of the boundaries higher than the other.
-        """
-        extra_x = self.extra_x
-
-        depth = self._gen_value_if_need(ModelConfig.InclinedLayer.min_depth,
-                                        ModelConfig.InclinedLayer.max_depth,
-                                        self.depth)
-        depth = -depth
-        height = self._gen_value_if_need(ModelConfig.InclinedLayer.min_height,
-                                         ModelConfig.InclinedLayer.max_height,
-                                         self.height)
-        height = -height
-        angle = self._gen_value_if_need(ModelConfig.InclinedLayer.min_angle,
-                                        ModelConfig.InclinedLayer.max_angle,
-                                        self.angle,
-                                        True)
-        """The length of the blow should not be greater than the value, 
-        which means that the sum of x should not be the same value"""
-        x_1 = rand.uniform(ModelConfig.CurvedLayer.min_width_curve, ModelConfig.CurvedLayer.max_width_curve)
-        x_2 = rand.uniform(ModelConfig.CurvedLayer.min_width_curve, ModelConfig.CurvedLayer.max_width_curve - x_1)
-        x_3 = rand.uniform(ModelConfig.CurvedLayer.min_width_curve, ModelConfig.CurvedLayer.max_width_curve - x_2)
-        """We calculate the coordinates for the inflation in a horizontal position of the layer, 
-        the user can set only the initial coordinate of the inflation (the rightmost point) 
-        and the height of the fault relative to the layer"""
-        coord_0 = [self._gen_value_if_need(ModelConfig.World.left,
-                                           ModelConfig.World.right,
-                                           self.start), depth]
-        coord_1 = [coord_0[0] + x_1, depth + self._gen_value_if_need(ModelConfig.CurvedLayer.min_height_curve,
-                                                                      ModelConfig.CurvedLayer.max_height_curve,
-                                                                      self.height_curve)]
-
-        coord_2 = [coord_1[0] + x_2, depth + self._gen_value_if_need(ModelConfig.CurvedLayer.min_height_curve,
-                                                                      ModelConfig.CurvedLayer.max_height_curve,
-                                                                      self.height_curve)]
-        coord_3 = [coord_2[0] + x_3, depth]
-        '''
-        We calculate the polygon immediately in depth coordinates so as not to get confused, 
-        including with the definition of the angle
-        '''
-
-        polygon = Polygon([[ModelConfig.World.left - extra_x, depth], coord_0, coord_1, coord_2, coord_3,
-                        [ModelConfig.World.right+extra_x, depth],
-                        [ModelConfig.World.right+extra_x, depth + height],
-                        [ModelConfig.World.left-extra_x, depth + height]])
-
-        '''
-        Rotate the polygon and return the depth 
-        to it by finding the intersection of the extended polygon with the walls of the world
-        '''
-        polygon = shapely.affinity.rotate(geom=polygon, angle=angle)
-        _, z_values = self.get_values_from_polygon(polygon, as_vectors=True)
-        z_min = min(z_values)
-        z_max = max(z_values)
-        if 0 <= angle <= 90:
-            line = LineString([[ModelConfig.World.right, z_min], [ModelConfig.World.right, z_max]])
-        elif -90 <= angle < 0:
-            line = LineString([[ModelConfig.World.left, z_min], [ModelConfig.World.left, z_max]])
-        else:
-            raise ValueError("Ange must be between -90 and 90")
-
-        line = polygon.intersection(line)
-        min_point = max(np.array(line)[:, 1])
-        '''
-        Even if the layer crosses the wall of the world at the border of the world, 
-        the code will work correctly
-        '''
-        dz = -depth + min_point
-        coords_of_polygon = self.get_values_from_polygon(polygon)
-        coords_of_polygon = [(coord[0], coord[1] - dz) for coord in coords_of_polygon]
-
-        polygon = Polygon(coords_of_polygon)
-        world_polygon = Polygon(ResObject.get_world_pts())
-        polygon = world_polygon.intersection(polygon)
-        self.show_poly(polygon)
 
 class PGMeshCreator:
     def __init__(self, resobjects_list: Union[ResObject, List[ResObject]]):
@@ -609,20 +689,21 @@ class PGMeshCreator:
         return gpd.GeoDataFrame({'geometry': res_polygons, 'marker': res_markers})
 
 
-if __name__ == "__main__":
-    from pygimli.viewer.mpl import drawMesh
-
-    rand.seed(1)
-    np.random.seed(1)
-
-    layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
-    layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
-    layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
-
-    # layer1 = Buldge(marker=1, angle=-30, depth=100, height=20)
-    mesh = PGMeshCreator([layer1, layer2, layer3])
-    plc = mesh.plc
-    fig, ax = pg.plt.subplots()
-    drawMesh(ax, plc)
-    drawMesh(ax, mt.createMesh(plc))
-    pg.wait()
+# if __name__ == "__main__":
+#     from pygimli.viewer.mpl import drawMesh
+#
+#     rand.seed(1)
+#     np.random.seed(1)
+#
+#     layer1 = InclinedLayer(angle=-12, height=50, marker=1, depth=20)
+#     layer2 = InclinedLayer(angle=2, height=20, marker=2, depth=20)
+#     layer3 = InclinedLayer(angle=0, height=70, marker=3, depth=120)
+#     poly = Pinch(angle=70, depth=30, height=30, marker=4)
+#
+#     # layer1 = Buldge(marker=1, angle=-30, depth=100, height=20)
+#     mesh = PGMeshCreator([layer1, layer2, layer3, poly])
+#     plc = mesh.plc
+#     fig, ax = pg.plt.subplots()
+#     drawMesh(ax, plc)
+#     drawMesh(ax, mt.createMesh(plc))
+#     pg.wait()
