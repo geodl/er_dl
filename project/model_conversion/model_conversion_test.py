@@ -2,8 +2,12 @@ from matplotlib import pyplot as plt
 import pygimli as pg
 from pygimli import meshtools as mt
 import numpy as np
+import os
+import shutil
 
 #####################################################################
+
+verbose = 0
 
 # ПАРАМЕТРЫ ПРЯМОУГОЛЬНОЙ МОДЕЛИ (РЕГУЛИРУЕТСЯ):
 x_f = 0
@@ -11,10 +15,11 @@ x_l = 580
 z_f = 0
 
 # ОТРИЦАТЕЛЬНОЕ ЗНАЧЕНИЕ ГЛУБИНЫ (!)
-z_l = -60
+z_l = -60.4
 
-nx = 581
-nz = 161
+# dx = (x_l - x_f)/(nx-1)
+nx = 233
+nz = 41
 
 #####################################################################
 
@@ -32,10 +37,21 @@ model = world + line + circle + block
 
 # ЗАПИЛИЛИ СЕТКУ:
 mesh_triangular = mt.createMesh(model, quality=34)
+
+shutil.rmtree('meshes')
+os.mkdir('meshes')
+os.chdir('meshes')
+mesh_triangular.save('mesh_0')
 pg.show(mesh_triangular)
 
 # ЗНАЧЕНИЯ СОПРОТИВЛЕНИЙ В ОБЪЕКТАХ:
 rhomap = [[0, 75], [1, 50], [2, 125], [3, 200], [4, 200], [5, 300]]
+
+with open('map_0.txt', 'w') as res:
+    print(str(rhomap), file=res)
+    res.close()
+
+os.chdir('..')
 
 # ИЗВЛЕКАЕМ ЗНАЧЕНИЯ МАРКЕРОВ В КАЖДОЙ ЯЧЕЙКЕ, ЗАТЕМ ВРУЧНУЮ ЗАПОЛНЯЕМ СЕТКУ СОПРОТИВЛЕНИЯМИ
 markers = []
@@ -61,9 +77,50 @@ pg.show(mesh_rectangular)
 
 # ЗНАЧЕНИЯ СОПРОТИВЛЕНИЙ В ПРЯМОУГОЛЬНЫХ ЯЧЕЙКАХ МОЖНО ПОЛУЧИТЬ С ПОМОЩЬЮ ИНТЕРПОЛЯЦИИ:
 rectangular_res = np.array(mt.interpolate(mesh_rectangular, mesh_triangular, triangular_res))
-print(max(rectangular_res))
 
 # ПОКАЗЫВАЕМ ЗАПОЛНЕННУЮ МОДЕЛЬ В ВИДЕ ПРЯМОУГОЛЬНОЙ СЕТКИ
 pg.show(mesh_rectangular, rectangular_res)
 
-plt.show()
+# ОСТАЛОСЬ ПОЛУЧИТЬ ЗНАЧЕНИЯ В УЗЛАХ И ЗАПИСАТЬ В ТАБЛИЦУ
+node_rho = mt.cellDataToNodeData(mesh=mesh_rectangular, data=rectangular_res)
+
+table_of_nodes = np.zeros(shape=(nx, nz))
+for i in range(nx):
+    for j in range(nz):
+        table_of_nodes[i][j] = np.round(node_rho[j*nx+i])
+table_of_nodes = np.transpose(table_of_nodes)
+
+#####################################################################
+
+shutil.rmtree('test')
+os.mkdir('test')
+os.chdir('test')
+
+# ЗАПИСЫВАЕМ ВСЕ В .DAT (Для Алексея)
+with open('model_0.dat', 'w') as model:
+    print("%-7s%-9s%-13s%-7s" % ('#X', 'Z', 'log_Rho', 'Rho'), file=model)
+    for i in range(nx):
+        for j in range(nz):
+            print("%-7.2f%-9.2f%-13.2f%-7.2f" % (X[i], Z[j], np.log10(table_of_nodes[j][i]),
+                                                 table_of_nodes[j][i]), file=model)
+    model.close()
+
+# ЗАПИСЬ В .СSV ДЛЯ МОЕГО АЛГОРИТМА ПРЯМОЙ ЗАДАЧИ
+with open('model_0.csv', 'w') as model:
+    print('#X,Z,log_Rho,Rho', file=model)
+    for i in range(nx):
+        for j in range(nz):
+            print(str(np.round(X[i], decimals=2)) + ',' + str(np.round(Z[j], decimals=2)) + ',' + str(
+                np.round(np.log10(table_of_nodes[j][i]), decimals=2)) + ',' + str(
+                np.round(table_of_nodes[j][i], decimals=2)), file=model)
+    model.close()
+
+os.chdir('..')
+
+# plt.figimage(table_of_nodes)
+
+if verbose == 1:
+    plt.show()
+
+a = np.fromstring(str(rhomap), dtype=float, sep='],')
+print(a)

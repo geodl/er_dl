@@ -31,8 +31,8 @@ def direct_model(model, number, verbose):
     N_L = int(L/h + 1)             # КОЛ-ВО ЭЛЕКТРОДОВ НА ПРОФИЛЕ
     x0 = 0                         # НАЧАЛО ПРОФИЛЯ ИЗМЕРЕНИЙ (НЕ ДОЛЖЕН ВЫЛЕЗАТЬ ЗА ПРЕДЕЛЫ МОДЕЛИ!)
 
-    # СЧИТКА ДАННЫХ МОДЕЛИ ИЗ ТАБЛИЦЫ .DAT
-    data = pd.read_table(model, usecols=['#X', 'Z', 'log_Rho', 'Rho'])
+    # СЧИТКА ДАННЫХ МОДЕЛИ ИЗ ТАБЛИЦЫ .CSV
+    data = pd.read_csv(model, usecols=['#X', 'Z', 'log_Rho', 'Rho'])
     X = np.linspace(0, 580, 233)
     Z = np.linspace(-60.4, 0, 41)
     R = np.array(data['Rho'])
@@ -104,7 +104,8 @@ shutil.rmtree(directory, ignore_errors=True)
 os.mkdir(directory)
 
 # ИНИЦИИРУЕМ ФУНКЦИЮ ДЛЯ МОДЕЛЕЙ № 9,15,16:
-for i in [9, 15, 16]:
+for i in [0]:
     os.chdir('models')
-    filename = 'model_' + str(i) + '.dat'
+    filename = 'model_' + str(i) + '.csv'
     direct_model(model=filename, verbose=1, number=i)
+    os.chdir('..')
