@@ -910,6 +910,8 @@ class Compose:
         "Take the compass list and create a plc."
         self.final = None
         self.get_plc()
+        self.rhomap = None
+        self.fill_data()
 
     @staticmethod
     def create_fault():
@@ -965,6 +967,7 @@ class Compose:
         np.random.shuffle(markers)
         for i in range(len(self.compos)):
             self.compos[i].marker = markers[i]
+
     """The get_markers method measures the length of the campos list and, if it is not empty, 
     creates a shared polygon and retrieves the plc attribute from it. 
     If the list is empty, the class attributes are redefined."""
@@ -974,17 +977,35 @@ class Compose:
         else:
             Compose.__init__(self)
 
+    def fill_data(self):
+        rhomap = []
+        for i in range(len(self.compos)+1):
+            rhomap.append([i, round(np.random.uniform(10, 10000), 2)])
+        self.rhomap = rhomap
 
 if __name__ == "__main__":
     from pygimli.viewer.mpl import drawMesh
     from project.config import common_config
+    import os
+    from pygimli import meshtools as msh
+    import pygimli.physics.ert as ert
 
     def create_synthetics(num: Optional[int] = 1):
-        for i in range(num):
-            plc = Compose().final
-            fig, ax = pg.plt.subplots()
-            drawMesh(ax, plc)
-            drawMesh(ax, mt.createMesh(plc))
-            pg.wait()
 
-    create_synthetics(num=10)
+        for i in range(num):
+            composition = Compose()
+            rhomap = composition.rhomap
+            plc = composition.final
+            # msh.appendTetrahedronBoundary(mesh=plc, xbound=1000, ybound=200, isSubSurface=True, verbose=True)
+            os.chdir("models")
+            plc.save("mesh" + str(i+1))
+            file = open("map_" + str(i+1) + ".txt", "w")
+            file.write(str(rhomap))
+            file.close()
+            os.chdir('..')
+            # fig, ax = pg.plt.subplots()
+            # drawMesh(ax, plc)
+            # drawMesh(ax, mt.createMesh(plc))
+            # pg.wait()
+
+    create_synthetics(num=5)
