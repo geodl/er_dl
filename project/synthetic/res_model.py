@@ -981,7 +981,11 @@ class Compose:
         rhomap = []
         for i in range(len(self.compos)+1):
             rhomap.append([i, round(np.random.uniform(10, 10000), 2)])
-        self.rhomap = rhomap
+        map = ''
+        for i in range(len(rhomap)):
+            j = rhomap[i]
+            map += str(j[0]) + ' ' + str(j[1]) + ' '
+        self.rhomap = map[0: -1]
 
 if __name__ == "__main__":
     from pygimli.viewer.mpl import drawMesh
@@ -1000,7 +1004,7 @@ if __name__ == "__main__":
             os.chdir("models")
             plc.save("mesh" + str(i+1))
             file = open("map_" + str(i+1) + ".txt", "w")
-            file.write(str(rhomap))
+            file.write(rhomap)
             file.close()
             os.chdir('..')
             # fig, ax = pg.plt.subplots()
