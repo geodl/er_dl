@@ -38,7 +38,8 @@ model = world + line + circle + block
 # ЗАПИЛИЛИ СЕТКУ:
 mesh_triangular = mt.createMesh(model, quality=34)
 
-shutil.rmtree('meshes')
+if os.path.exists('meshes'):
+    shutil.rmtree('meshes')
 os.mkdir('meshes')
 os.chdir('meshes')
 mesh_triangular.save('mesh_0')
@@ -46,9 +47,12 @@ pg.show(mesh_triangular)
 
 # ЗНАЧЕНИЯ СОПРОТИВЛЕНИЙ В ОБЪЕКТАХ:
 rhomap = [[0, 75], [1, 50], [2, 125], [3, 200], [4, 200], [5, 300]]
+map = ''
+for i in range(len(rhomap)):
+    map += str(i) + ' ' + str(rhomap[i][1]) + ' '
 
 with open('map_0.txt', 'w') as res:
-    print(str(rhomap), file=res)
+    print(map, file=res)
     res.close()
 
 os.chdir('..')
@@ -92,7 +96,8 @@ table_of_nodes = np.transpose(table_of_nodes)
 
 #####################################################################
 
-shutil.rmtree('test')
+if os.path.exists('test'):
+    shutil.rmtree('test')
 os.mkdir('test')
 os.chdir('test')
 
@@ -121,6 +126,3 @@ os.chdir('..')
 
 if verbose == 1:
     plt.show()
-
-a = np.fromstring(str(rhomap), dtype=float, sep='],')
-print(a)

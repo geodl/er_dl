@@ -18,8 +18,10 @@ Z_l = -60.4
 Nx = 233
 Nz = 41
 
-shutil.rmtree('dat_models')
-shutil.rmtree('csv_models')
+if os.path.exists('dat_models'):
+    shutil.rmtree('dat_models')
+if os.path.exists('csv_models'):
+    shutil.rmtree('csv_models')
 os.mkdir('dat_models')
 os.mkdir('csv_models')
 
@@ -30,8 +32,16 @@ def convert_model(model_file, rho_file, x_f, x_l, z_f, z_l, nx, nz, verbose, num
     pg.show(mesh_triangular)
 
     with open(rho_file, 'r') as res:
-        rhomap = np.array(res.read())
+        map = res.read()
         res.close()
+
+    map = np.fromstring(map, dtype=float, sep=' ')
+    rhomap = []
+    k = 0
+    while k < len(map):
+        rhomap.append([map[k], map[k+1]])
+        k += 2
+    rhomap = np.array(rhomap)
 
     os.chdir('..')
 
