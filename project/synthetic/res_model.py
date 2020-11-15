@@ -1000,9 +1000,8 @@ if __name__ == "__main__":
             composition = Compose()
             rhomap = composition.rhomap
             plc = composition.final
-            # msh.appendTetrahedronBoundary(mesh=plc, xbound=1000, ybound=200, isSubSurface=True, verbose=True)
             os.chdir("models")
-            plc.save("mesh" + str(i+1))
+            plc.save("mesh_" + str(i+1))
             file = open("map_" + str(i+1) + ".txt", "w")
             file.write(rhomap)
             file.close()
