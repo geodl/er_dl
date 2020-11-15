@@ -120,8 +120,7 @@ os.mkdir(directory)
 
 # ИНИЦИИРУЕМ ФУНКЦИЮ ДЛЯ МОДЕЛЕЙ № 9,15,16:
 for i in [0]:
-    os.chdir('models')
+    os.chdir('csv_models')
     filename = 'model_' + str(i) + '.csv'
     direct_model(model=filename, cable_length=cable_length, elecs_step=elecs_step, x_f=X_f, x_l=X_l, z_f=Z_f, z_l=Z_l,
                  nx=Nx, nz=Nz, verbose=True, number=i)
-    os.chdir('..')

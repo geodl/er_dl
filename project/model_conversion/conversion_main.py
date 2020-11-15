@@ -102,9 +102,8 @@ def convert_model(model_file, rho_file, x_f, x_l, z_f, z_l, nx, nz, verbose, num
 
 
 for i in [0]:
-    os.chdir('meshes')
+    os.chdir('models')
     filename = 'mesh_' + str(i) + '.bms'
     rhoname = 'map_' + str(i) + '.txt'
     convert_model(model_file=filename, rho_file=rhoname, x_f=X_f, x_l=X_l,
                   z_f=Z_f, z_l=Z_l, nx=Nx, nz=Nz, verbose=True, number=i)
-    os.chdir('..')
