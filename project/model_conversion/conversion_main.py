@@ -29,7 +29,7 @@ os.mkdir('csv_models')
 def convert_model(model_file, rho_file, x_f, x_l, z_f, z_l, nx, nz, verbose, number):
 
     mesh_triangular = pg.load(model_file)
-    pg.show(mesh_triangular)
+    # pg.show(mesh_triangular)
 
     with open(rho_file, 'r') as res:
         map = res.read()
@@ -59,9 +59,9 @@ def convert_model(model_file, rho_file, x_f, x_l, z_f, z_l, nx, nz, verbose, num
     X = np.linspace(x_f, x_l, nx)
     Z = np.linspace(z_f, z_l, nz)
     mesh_rectangular = mt.createGrid(x=X, y=Z)
-    pg.show(mesh_rectangular)
+    # pg.show(mesh_rectangular)
 
-    rectangular_res = np.array(mt.interpolate(mesh_rectangular, mesh_triangular, triangular_res))
+    rectangular_res = np.array(mt.interpolate(mesh_rectangular, mesh_triangular, triangular_res, method='harmonic'))
     pg.show(mesh_rectangular, rectangular_res)
 
     node_rho = mt.cellDataToNodeData(mesh=mesh_rectangular, data=rectangular_res)
@@ -101,7 +101,7 @@ def convert_model(model_file, rho_file, x_f, x_l, z_f, z_l, nx, nz, verbose, num
         plt.show()
 
 
-for i in [0]:
+for i in range(0, 10):
     os.chdir('models')
     filename = 'mesh_' + str(i) + '.bms'
     rhoname = 'map_' + str(i) + '.txt'

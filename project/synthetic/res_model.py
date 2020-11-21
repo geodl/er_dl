@@ -1,4 +1,6 @@
 from typing import Union, Optional, List, Tuple, Iterable
+import random
+from pathlib import Path
 
 import pygimli as pg
 import numpy as np
@@ -987,28 +989,63 @@ class Compose:
             map += str(j[0]) + ' ' + str(j[1]) + ' '
         self.rhomap = map[0: -1]
 
+
+def create_synthetics(num: Optional[int] = 1):
+    for idx in range(num):
+        create_sample(idx)
+
+
+def create_sample(idx: Optional[int] = None):
+    project_folder = Path(__file__).resolve().parents[2] / 'project/model_conversion/models'
+
+    np.random.seed(idx)
+    random.seed(idx)
+
+    composition = Compose()
+    rhomap = composition.rhomap
+    plc = composition.final
+
+    plc = mt.createMesh(plc, quality=10)
+    plc.save(str(project_folder / ("mesh_" + str(idx + 1))))
+    file = open(project_folder / ("map_" + str(idx + 1) + ".txt"), "w")
+    file.write(rhomap)
+    file.close()
+
+    # os.chdir('..')
+    # fig, ax = pg.plt.subplots()
+    # drawMesh(ax, plc)
+    # drawMesh(ax, mt.createMesh(plc))
+    # pg.wait()
+
+
 if __name__ == "__main__":
-    from pygimli.viewer.mpl import drawMesh
-    from project.config import common_config
-    import os
-    from pygimli import meshtools as msh
-    import pygimli.physics.ert as ert
+    # from pygimli.viewer.mpl import drawMesh
+    # from project.config import common_config
+    # import os
+    # import random
+    # from tqdm import tqdm
+    # from pygimli import meshtools as msh
+    # import pygimli.physics.ert as ert
 
-    def create_synthetics(num: Optional[int] = 1):
 
-        for i in range(num):
-            composition = Compose()
-            rhomap = composition.rhomap
-            plc = composition.final
-            os.chdir("models")
-            plc.save("mesh_" + str(i+1))
-            file = open("map_" + str(i+1) + ".txt", "w")
-            file.write(rhomap)
-            file.close()
-            os.chdir('..')
-            # fig, ax = pg.plt.subplots()
-            # drawMesh(ax, plc)
-            # drawMesh(ax, mt.createMesh(plc))
-            # pg.wait()
 
-    create_synthetics(num=5)
+
+    # create_synthetics(num=20)
+    # create_sample(0)
+
+    ids = list(range(1000))
+
+    from python_utils.runner import Runner
+
+    runner = Runner('process', 16)
+    runner(create_sample, ids)
+
+
+    # file = Path('F:\PycharmProjects\er_dl\project\model_conversion\models\mesh_1.bms')
+    # print(file.stat().st_size / 1024)
+    # plc = pg.meshtools.readPLC('F:\PycharmProjects\er_dl\project\synthetic\models\mesh_1.bms')
+    # print(plc)
+    # fig, ax = pg.plt.subplots()
+    # drawMesh(ax, plc)
+    # # drawMesh(ax, mt.createMesh(plc))
+    # pg.wait()
