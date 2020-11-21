@@ -38,10 +38,10 @@ model = world + line + circle + block
 # ЗАПИЛИЛИ СЕТКУ:
 mesh_triangular = mt.createMesh(model, quality=34)
 
-if os.path.exists('meshes'):
-    shutil.rmtree('meshes')
-os.mkdir('meshes')
-os.chdir('meshes')
+if os.path.exists('models'):
+    shutil.rmtree('models')
+os.mkdir('models')
+os.chdir('models')
 mesh_triangular.save('mesh_0')
 pg.show(mesh_triangular)
 
