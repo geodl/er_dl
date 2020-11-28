@@ -4,7 +4,6 @@ import pygimli as pg
 import numpy as np
 from pygimli import meshtools as mt
 from pygimli.core._pygimli_ import Mesh
-import random as rand
 from shapely.affinity import rotate, translate
 from shapely.geometry import Polygon, MultiPolygon, LineString
 import geopandas as gpd
@@ -993,6 +992,10 @@ if __name__ == "__main__":
     import os
     from pygimli import meshtools as msh
     import pygimli.physics.ert as ert
+    from pathlib import Path
+    from project.config import common_config
+
+    np.random.seed(1)
 
     def create_synthetics(num: Optional[int] = 1):
 
@@ -1000,15 +1003,18 @@ if __name__ == "__main__":
             composition = Compose()
             rhomap = composition.rhomap
             plc = composition.final
-            os.chdir("models")
-            plc.save("mesh_" + str(i+1))
-            file = open("map_" + str(i+1) + ".txt", "w")
+
+            save_dir = common_config.root_dir / 'project/model_conversion/models'
+
+            plc = mt.createMesh(plc, quality=10)
+            plc.save(str(save_dir / ("mesh_" + str(i+1))))
+            file = open(save_dir / ("map_" + str(i+1) + ".txt"), "w")
             file.write(rhomap)
             file.close()
-            os.chdir('..')
-            # fig, ax = pg.plt.subplots()
-            # drawMesh(ax, plc)
-            # drawMesh(ax, mt.createMesh(plc))
-            # pg.wait()
 
-    create_synthetics(num=5)
+            fig, ax = pg.plt.subplots()
+            drawMesh(ax, plc)
+            drawMesh(ax, mt.createMesh(plc))
+            pg.wait()
+
+    create_synthetics(num=1)

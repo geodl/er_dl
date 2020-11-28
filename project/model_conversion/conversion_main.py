@@ -4,6 +4,7 @@ from pygimli import meshtools as mt
 import numpy as np
 import os
 import shutil
+from project.config import common_config
 
 # ЭТО ГЛАВНЫЙ СКРИПТ
 # КОММЕНТЫ К ЭТОЙ ФУНКЦИИ В ТЕСТОВОМ СКРИПТЕ !
@@ -11,19 +12,25 @@ import shutil
 
 # ПАРАМЕТРЫ ПРЯМОУГОЛЬНОЙ МОДЕЛИ:
 X_f = 0
-X_l = 580
+X_l = 1000
 Z_f = 0
-Z_l = -60.4
+Z_l = -200
 # dx = (x_l - x_f)/(nx-1)
-Nx = 233
-Nz = 41
+Nx = 401
+Nz = 81
 
-if os.path.exists('dat_models'):
-    shutil.rmtree('dat_models')
-if os.path.exists('csv_models'):
-    shutil.rmtree('csv_models')
-os.mkdir('dat_models')
-os.mkdir('csv_models')
+# if os.path.exists('dat_models'):
+#     shutil.rmtree('dat_models')
+# if os.path.exists('csv_models'):
+#     shutil.rmtree('csv_models')
+# os.mkdir('dat_models')
+# os.mkdir('csv_models')
+
+dat_models_dir = common_config.root_dir / 'project/model_conversion/dat_models'
+csv_models_dir = common_config.root_dir / 'project/model_conversion/csv_models'
+
+dat_models_dir.mkdir(parents=True, exist_ok=True)
+csv_models_dir.mkdir(parents=True, exist_ok=True)
 
 
 def convert_model(model_file, rho_file, x_f, x_l, z_f, z_l, nx, nz, verbose, number):
@@ -101,7 +108,7 @@ def convert_model(model_file, rho_file, x_f, x_l, z_f, z_l, nx, nz, verbose, num
         plt.show()
 
 
-for i in [0]:
+for i in [1]:
     os.chdir('models')
     filename = 'mesh_' + str(i) + '.bms'
     rhoname = 'map_' + str(i) + '.txt'
