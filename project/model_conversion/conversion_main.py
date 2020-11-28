@@ -16,8 +16,8 @@ X_l = 1000
 Z_f = 0
 Z_l = -200
 # dx = (x_l - x_f)/(nx-1)
-Nx = 401
-Nz = 81
+Nx = 201
+Nz = 41
 
 # if os.path.exists('dat_models'):
 #     shutil.rmtree('dat_models')
@@ -94,6 +94,7 @@ def convert_model(model_file, rho_file, x_f, x_l, z_f, z_l, nx, nz, verbose, num
     os.chdir('..')
 
     os.chdir('csv_models')
+
     with open(outfile_csv, 'w') as model:
         print('#X,Z,log_Rho,Rho', file=model)
         for i in range(nx):
@@ -108,7 +109,7 @@ def convert_model(model_file, rho_file, x_f, x_l, z_f, z_l, nx, nz, verbose, num
         plt.show()
 
 
-for i in [1]:
+for i in [0, 1]:
     os.chdir('models')
     filename = 'mesh_' + str(i) + '.bms'
     rhoname = 'map_' + str(i) + '.txt'

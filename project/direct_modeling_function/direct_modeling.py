@@ -32,12 +32,12 @@ X_l = 1000
 Z_f = 0
 Z_l = -200
 # dx = (x_l - x_f)/(nx-1)
-Nx = 401
-Nz = 81
+Nx = 201
+Nz = 41
 
 # ПАРАМЕТРЫ КОСЫ
 elecs_step = 10
-cable_length = 750
+cable_length = 400
 
 
 def direct_model(model, x_f, x_l, z_f, z_l, nx, nz, elecs_step, cable_length, number, verbose):
@@ -68,6 +68,8 @@ def direct_model(model, x_f, x_l, z_f, z_l, nx, nz, elecs_step, cable_length, nu
 
     # КОНВЕРТАЦИЯ ЗНАЧЕНИЙ В УЗЛАХ В ЗНАЧЕНИЯ ПО ПРЯМОУГОЛЬНИЧКАМ СЕТКИ
     # НА ВЫХОДЕ ПОЛУЧАЕМ НОВЫЙ ВЕКТОР СОПРОТИВЛЕНИЙ, КОТОРЫЙ ПРИГОДЕН ДЛЯ АЛГОРИТМА ПРЯМОЙ ЗАДАЧИ
+    print(X.shape, Z.shape, Rho.shape, grid)
+
     new_Rho = mt.nodeDataToCellData(grid, Rho)
 
     # ВЫВОД ВХОДНОЙ МОДЕЛИ
@@ -119,7 +121,7 @@ if os.path.exists(directory):
 os.mkdir(directory)
 
 # ИНИЦИИРУЕМ ФУНКЦИЮ ДЛЯ МОДЕЛЕЙ № 9,15,16:
-for i in [0]:
+for i in [1]:
     os.chdir('csv_models')
     filename = 'model_' + str(i) + '.csv'
     direct_model(model=filename, cable_length=cable_length, elecs_step=elecs_step, x_f=X_f, x_l=X_l, z_f=Z_f, z_l=Z_l,
