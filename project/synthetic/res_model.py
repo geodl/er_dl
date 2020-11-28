@@ -11,6 +11,8 @@ from shapely.affinity import rotate, translate
 from shapely.geometry import Polygon, MultiPolygon, LineString
 import geopandas as gpd
 import matplotlib.pyplot as plt
+from pygimli.viewer.mpl import drawMesh
+from pygimli.physics import ert
 
 ResType = Union[float, np.ndarray]
 PointType = Union[Tuple[float, float], np.ndarray]  # point coordinates sorted in (x, y) order
@@ -43,7 +45,7 @@ class ModelConfig:
         """
         left = 0
         top = 0
-        right = 1000
+        right = 500
         bottom = 200
 
     class HorizontalLayer(ResValues):
@@ -52,8 +54,8 @@ class ModelConfig:
         height: thickness of layer in orthogonal direction
         depth: depth of top of layer
         """
-        min_height = 10
-        max_height = 30
+        min_height = 30
+        max_height = 60
         min_depth = 5
         max_depth = 50
 
@@ -898,7 +900,8 @@ class Compose:
         self.angle_big = self.have_angle * np.random.uniform(-30, 30)
         self.angle_mini = self.have_angle * np.random.uniform(-5, 5)
         "Choosing a composition."
-        self.select = np.random.choice([1, np.random.choice([2, 3, 4])])
+        # self.select = np.random.choice([1, np.random.choice([2, 3, 4])])
+        self.select = np.random.choice([1, 2, 3, 4])
         if self.select == 1:
             self.get_layers()
         elif self.select == 2:
@@ -952,7 +955,7 @@ class Compose:
         for num_layer in range(num_layers):
             layer = InclinedLayer(depth=depth, angle=self.angle_big, marker=1)
             self.compos.append(layer)
-            depth = depth + layer.height
+            depth = depth + layer.height / np.cos(np.deg2rad(self.angle_big))
         if self.have_lens == 1:
             self.get_lens()
         else:
@@ -1005,13 +1008,32 @@ def create_sample(idx: Optional[int] = None):
     rhomap = composition.rhomap
     plc = composition.final
 
-    plc = mt.createMesh(plc, quality=10)
+    # scheme = ert.createERTData(elecs=np.arange(0, 500, 15).astype(np.int),
+    #                            schemeName='dd')
+
+    # scheme = ert.createERTData(elecs=np.linspace(0, 500, 10),
+    #                            schemeName='dd')
+    #
+    # for p in scheme.sensors():
+    #     plc.createNode(p)
+    #     plc.createNode(p - [0, 0.1])
+    #
+    # mesh = mt.createMesh(plc, quality=34)
+    #
+    # print(plc)
+    # print(mesh)
+    #
+    # data = ert.simulate(mesh, scheme=scheme, res=rhomap, noiseLevel=1,
+    #                     noiseAbs=1e-6, seed=1337)
+
+    # pg.show(mesh, data=rhomap, label=pg.unit('res'), showMesh=True)
+
+    plc = mt.createMesh(plc)
     plc.save(str(project_folder / ("mesh_" + str(idx + 1))))
     file = open(project_folder / ("map_" + str(idx + 1) + ".txt"), "w")
     file.write(rhomap)
     file.close()
 
-    # os.chdir('..')
     # fig, ax = pg.plt.subplots()
     # drawMesh(ax, plc)
     # drawMesh(ax, mt.createMesh(plc))
@@ -1033,12 +1055,13 @@ if __name__ == "__main__":
     # create_synthetics(num=20)
     # create_sample(0)
 
-    ids = list(range(1000))
+    ids = list(range(10))
 
     from python_utils.runner import Runner
 
-    runner = Runner('process', 16)
-    runner(create_sample, ids)
+    runner = Runner('loop', 16)
+    # runner(create_sample, ids)
+    create_sample(0)
 
 
     # file = Path('F:\PycharmProjects\er_dl\project\model_conversion\models\mesh_1.bms')
