@@ -11,12 +11,12 @@ import shutil
 
 # ПАРАМЕТРЫ ПРЯМОУГОЛЬНОЙ МОДЕЛИ:
 X_f = 0
-X_l = 580
+X_l = 1000
 Z_f = 0
-Z_l = -60.4
+Z_l = -200
 # dx = (x_l - x_f)/(nx-1)
-Nx = 233
-Nz = 41
+Nx = 401
+Nz = 81
 
 if os.path.exists('dat_models'):
     shutil.rmtree('dat_models')

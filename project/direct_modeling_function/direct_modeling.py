@@ -28,16 +28,16 @@ directory = 'solutions'
 
 # ПАРАМЕТРЫ ПРЯМОУГОЛЬНОЙ МОДЕЛИ:
 X_f = 0
-X_l = 580
+X_l = 1000
 Z_f = 0
-Z_l = -60.4
+Z_l = -200
 # dx = (x_l - x_f)/(nx-1)
-Nx = 233
-Nz = 41
+Nx = 1001
+Nz = 201
 
 # ПАРАМЕТРЫ КОСЫ
-elecs_step = 15
-cable_length = 150
+elecs_step = 10
+cable_length = 750
 
 
 def direct_model(model, x_f, x_l, z_f, z_l, nx, nz, elecs_step, cable_length, number, verbose):
@@ -53,11 +53,11 @@ def direct_model(model, x_f, x_l, z_f, z_l, nx, nz, elecs_step, cable_length, nu
 
     # КОЛДУНСТВО ДЛЯ ПЕРЕПИСЫВАНИЯ ВЕКТОРА СОПРОТИВЛЕНИЙ
     Rho = np.zeros(shape=(nx, nz))
-    for i in range(233):
+    for i in range(nx):
         Rho[i] = R[nz*i:nz*(i+1)]
     Rho = np.transpose(Rho)
 
-    for i in range(41):
+    for i in range(nz):
         R[nx*i:nx*(i+1)] = Rho[i]
 
     # ГОТОВО
