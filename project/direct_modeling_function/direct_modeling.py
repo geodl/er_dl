@@ -28,12 +28,12 @@ directory = 'solutions'
 
 # ПАРАМЕТРЫ ПРЯМОУГОЛЬНОЙ МОДЕЛИ:
 X_f = 0
-X_l = 500
+X_l = 1000
 Z_f = 0
 Z_l = -200
 # dx = (x_l - x_f)/(nx-1)
-Nx = 501
-Nz = 201
+Nx = 201
+Nz = 41
 
 # ПАРАМЕТРЫ КОСЫ
 elecs_step = 15
@@ -47,21 +47,29 @@ def direct_model(model, x_f, x_l, z_f, z_l, nx, nz, elecs_step, cable_length, nu
 
     # СЧИТКА ДАННЫХ МОДЕЛИ ИЗ ТАБЛИЦЫ .CSV
     data = pd.read_csv(model, usecols=['#X', 'Z', 'log_Rho', 'Rho'])
+    nx = len(np.unique(data['#X']))
+    nz = len(np.unique(data['Z']))
+
     X = np.linspace(x_f, x_l, nx)
     Z = np.linspace(z_f, z_l, nz)
     R = np.array(data['Rho'])
 
     # КОЛДУНСТВО ДЛЯ ПЕРЕПИСЫВАНИЯ ВЕКТОРА СОПРОТИВЛЕНИЙ
-    Rho = np.zeros(shape=(nx, nz))
-    for i in range(nz):
-        Rho[i] = R[nz*i:nz*(i+1)]
-    Rho = np.transpose(Rho)
 
-    for i in range(nx):
-        R[nx*i:nx*(i+1)] = Rho[i]
+    Rho = np.reshape(R, (nx, nz))
+    Rho = np.rot90(Rho, -1)
+
+    Rho = Rho.flatten(order='C')
+
+    # for i in range(nz):
+    #     Rho[i] = R[nz*i:nz*(i+1)]
+    # Rho = np.transpose(Rho)
+    #
+    # for i in range(nx):
+    #     R[nx*i:nx*(i+1)] = Rho[i]
 
     # ГОТОВО
-    Rho = R
+    # Rho = R
 
     # ГЕНЕРИМ СЕТОЧКУ ДЛЯ PYGIMLI
     grid = mt.createGrid(x=X, y=Z)
@@ -119,7 +127,9 @@ if os.path.exists(directory):
 os.mkdir(directory)
 
 # ИНИЦИИРУЕМ ФУНКЦИЮ ДЛЯ МОДЕЛЕЙ № 9,15,16:
-for i in [0]:
+
+
+for i in [0, 1, 3, 4, 5, 6, 7, 9]:
     os.chdir('csv_models')
     filename = 'model_' + str(i) + '.csv'
     direct_model(model=filename, cable_length=cable_length, elecs_step=elecs_step, x_f=X_f, x_l=X_l, z_f=Z_f, z_l=Z_l,

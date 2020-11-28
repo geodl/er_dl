@@ -45,7 +45,7 @@ class ModelConfig:
         """
         left = 0
         top = 0
-        right = 500
+        right = 1000
         bottom = 200
 
     class HorizontalLayer(ResValues):
@@ -999,7 +999,7 @@ def create_synthetics(num: Optional[int] = 1):
 
 
 def create_sample(idx: Optional[int] = None):
-    project_folder = Path(__file__).resolve().parents[2] / 'project/model_conversion/models'
+    conversion_models_folder = Path(__file__).resolve().parents[2] / 'project/model_conversion/models'
 
     np.random.seed(idx)
     random.seed(idx)
@@ -1029,13 +1029,13 @@ def create_sample(idx: Optional[int] = None):
     # pg.show(mesh, data=rhomap, label=pg.unit('res'), showMesh=True)
 
     plc = mt.createMesh(plc)
-    plc.save(str(project_folder / ("mesh_" + str(idx + 1))))
-    file = open(project_folder / ("map_" + str(idx + 1) + ".txt"), "w")
+    plc.save(str(conversion_models_folder / ("mesh_" + str(idx))))
+    file = open(conversion_models_folder / ("map_" + str(idx) + ".txt"), "w")
     file.write(rhomap)
     file.close()
 
     # fig, ax = pg.plt.subplots()
-    # drawMesh(ax, plc)
+    # # drawMesh(ax, plc)
     # drawMesh(ax, mt.createMesh(plc))
     # pg.wait()
 
@@ -1060,8 +1060,8 @@ if __name__ == "__main__":
     from python_utils.runner import Runner
 
     runner = Runner('loop', 16)
-    # runner(create_sample, ids)
-    create_sample(0)
+    runner(create_sample, ids)
+    # create_sample(0)
 
 
     # file = Path('F:\PycharmProjects\er_dl\project\model_conversion\models\mesh_1.bms')

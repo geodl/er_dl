@@ -94,12 +94,12 @@ def convert_model(x_f, x_l, z_f, z_l, nx, nz, verbose, root_dir, number):
 if __name__ == "__main__":
     # ПАРАМЕТРЫ ПРЯМОУГОЛЬНОЙ МОДЕЛИ:
     X_f = 0
-    X_l = 500
+    X_l = 1000
     Z_f = 0
     Z_l = -200
     # dx = (x_l - x_f)/(nx-1)
-    Nx = 501
-    Nz = 201
+    Nx = 201
+    Nz = 41
 
     if os.path.exists('dat_models'):
         shutil.rmtree('dat_models')
