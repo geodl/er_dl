@@ -36,8 +36,8 @@ Nx = 401
 Nz = 81
 
 # ПАРАМЕТРЫ КОСЫ
-elecs_step = 15
-cable_length = 500
+elecs_step = 10
+cable_length = 750
 
 
 def direct_model(model, x_f, x_l, z_f, z_l, nx, nz, elecs_step, cable_length, number, verbose):
@@ -51,15 +51,13 @@ def direct_model(model, x_f, x_l, z_f, z_l, nx, nz, elecs_step, cable_length, nu
     Z = np.linspace(z_f, z_l, nz)
     R = np.array(data['Rho'])
 
-    print(len(data), nx * nz)
-
     # КОЛДУНСТВО ДЛЯ ПЕРЕПИСЫВАНИЯ ВЕКТОРА СОПРОТИВЛЕНИЙ
     Rho = np.zeros(shape=(nx, nz))
-    for i in range(nz):
+    for i in range(nx):
         Rho[i] = R[nz*i:nz*(i+1)]
     Rho = np.transpose(Rho)
 
-    for i in range(nx):
+    for i in range(nz):
         R[nx*i:nx*(i+1)] = Rho[i]
 
     # ГОТОВО
