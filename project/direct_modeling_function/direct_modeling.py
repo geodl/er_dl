@@ -32,12 +32,12 @@ X_l = 1000
 Z_f = 0
 Z_l = -200
 # dx = (x_l - x_f)/(nx-1)
-Nx = 1001
-Nz = 201
+Nx = 401
+Nz = 81
 
 # ПАРАМЕТРЫ КОСЫ
-elecs_step = 10
-cable_length = 750
+elecs_step = 20
+cable_length = 500
 
 
 def direct_model(model, x_f, x_l, z_f, z_l, nx, nz, elecs_step, cable_length, number, verbose):
@@ -47,6 +47,7 @@ def direct_model(model, x_f, x_l, z_f, z_l, nx, nz, elecs_step, cable_length, nu
 
     # СЧИТКА ДАННЫХ МОДЕЛИ ИЗ ТАБЛИЦЫ .CSV
     data = pd.read_csv(model, usecols=['#X', 'Z', 'log_Rho', 'Rho'])
+    print(len(data['Rho']))
     X = np.linspace(x_f, x_l, nx)
     Z = np.linspace(z_f, z_l, nz)
     R = np.array(data['Rho'])
